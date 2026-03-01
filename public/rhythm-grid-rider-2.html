@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythm Grid Rider 2.0</title>
+    <style>
+        :root {
+            --primary-color: #00ffff;
+            --secondary-color: #ff00ff;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+            user-select: none;
+            cursor: crosshair;
+        }
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            z-index: 1;
+        }
+
+        /* UI Layer */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            z-index: 10;
+        }
+        .top-ui {
+            display: flex;
+            justify-content: space-between;
+            text-shadow: 0 0 10px var(--primary-color);
+            transition: text-shadow 0.5s;
+        }
+        .ui-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .stat {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary-color);
+            transition: color 0.5s;
+        }
+        .label {
+            font-size: 14px;
+            color: #ccc;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        #controls {
+            text-align: center;
+            color: #aaa;
+            font-size: 14px;
+            letter-spacing: 1px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+            margin: 0 auto;
+            width: fit-content;
+        }
+
+        /* Start Screen */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 16, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            transition: opacity 0.5s ease;
+            pointer-events: auto;
+        }
+        #start-screen h1 {
+            color: var(--primary-color);
+            font-size: 54px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 20px var(--primary-color);
+            text-align: center;
+        }
+        #start-screen p {
+            font-size: 18px;
+            color: #ccc;
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.5;
+            margin-bottom: 30px;
+        }
+
+        /* AI Panel */
+        .ai-panel {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            border: 1px solid var(--primary-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            pointer-events: auto;
+        }
+        .ai-panel input {
+            padding: 12px 20px;
+            font-size: 16px;
+            width: 350px;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            outline: none;
+            background: rgba(255,255,255,0.9);
+            color: #000;
+            transition: border 0.3s;
+        }
+        .ai-panel input:focus {
+            border: 2px solid var(--secondary-color);
+        }
+        .ai-panel button {
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            transition: transform 0.2s, filter 0.2s;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+        .ai-panel button:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2);
+        }
+        .ai-panel button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #loading-text {
+            display: none;
+            color: var(--secondary-color);
+            font-style: italic;
+            margin-top: 10px;
+            animation: pulse 1s infinite alternate;
+        }
+
+        #coach-msg {
+            position: absolute;
+            bottom: 80px;
+            width: 100%;
+            text-align: center;
+            color: var(--secondary-color);
+            font-weight: bold;
+            font-size: 20px;
+            text-shadow: 0 0 10px #000;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        #transmission-box {
+            display: none;
+            position: absolute;
+            right: 20px;
+            top: 120px;
+            width: 300px;
+            padding: 15px;
+            background: rgba(255,0,0,0.15);
+            border: 1px solid #f00;
+            color: #fff;
+            font-family: monospace;
+            font-size: 14px;
+            text-shadow: 0 0 5px #f00;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .pulse-text {
+            animation: pulse 1.5s infinite alternate;
+            cursor: pointer;
+            color: #fff;
+            margin-top: 30px;
+            padding: 10px;
+            pointer-events: auto;
+        }
+        .pulse-text:hover { color: var(--primary-color); }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.05); opacity: 1; text-shadow: 0 0 20px currentColor; }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div class="top-ui">
+            <div class="ui-group">
+                <span class="label">Score</span>
+                <span class="stat" id="score-val">0</span>
+            </div>
+            <div class="ui-group" style="align-items: center;">
+                <span class="label">Combo</span>
+                <span class="stat" id="combo-val" style="color: var(--secondary-color); font-size: 36px;">0</span>
+                <span class="label" id="theme-display" style="color: #fff; margin-top: 5px; display: none;">THEME: NEON DEFAULT</span>
+            </div>
+            <div class="ui-group" style="align-items: flex-end;">
+                <span class="label">Speed</span>
+                <span class="stat" id="speed-val">1.0x</span>
+                <span class="label" style="margin-top:10px;">Music Style [M]</span>
+                <span class="stat" id="style-val" style="font-size: 18px; color: #fff;">Synthwave</span>
+            </div>
+        </div>
+
+        <div id="coach-msg"></div>
+
+        <div id="transmission-box">
+            <div style="color:#f00; font-weight:bold; margin-bottom:5px; animation: pulse 1s infinite alternate;">⚠️ ROGUE AI INVASION ⚠️</div>
+            <div id="transmission-text"></div>
+        </div>
+
+        <div id="controls">
+            Move your sphere to catch the incoming notes. <br>
+            Press <strong>[M]</strong> for next Preset Style. Press <strong>[Space]</strong> to Mute.
+        </div>
+    </div>
+
+    <div id="start-screen">
+        <h1>RHYTHM GRID RIDER 2.0</h1>
+        <p>A procedural, AI-powered musical experience.<br>Don't miss a sphere, or the beat drops out!</p>
+
+        <div class="ai-panel">
+            <span class="label" style="color: #fff; letter-spacing: 3px;">✨ Generate Custom World ✨</span>
+            <input type="text" id="theme-input" placeholder="e.g., Cyberpunk City, Deep Space, Candy Kingdom...">
+            <button id="btn-generate">Create World &amp; Play</button>
+            <div id="loading-text">Gemini is synthesizing your reality...</div>
+        </div>
+
+        <h3 class="pulse-text" id="btn-start-default">OR CLICK HERE TO PLAY DEFAULT</h3>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        let score = 0;
+        let combo = 0;
+        let baseSpeed = 0.6;
+        let speedMultiplier = 1.0;
+        let gameActive = false;
+
+        let cameraShake = 0;
+        let currentCamX = 0;
+        let currentCamY = 5;
+
+        let isInvasionActive = false;
+
+        const apiKey = "";
+        let currentTheme = {
+            name: "Neon Default",
+            voiceName: "Kore",
+            startMsg: "Welcome to the grid.",
+            combo10Msg: "Great combo!",
+            combo20Msg: "Unstoppable momentum!",
+            envType: "city"
+        };
+
+        let audioCtx, masterGain, delayNode, delayFeedback;
+        let isMuted = false;
+
+        const musicStyles = [
+            { name: "Synthwave", wave: "sawtooth", filterMax: 3000, decay: 0.3, kickPattern: 1, scale: [130.81, 155.56, 174.61, 196.00, 233.08, 261.63, 311.13, 349.23] },
+            { name: "Techno", wave: "square", filterMax: 5000, decay: 0.15, kickPattern: 2, scale: [130.81, 138.59, 155.56, 174.61, 196.00, 207.65, 233.08, 261.63] },
+            { name: "Trance", wave: "supersaw", filterMax: 6000, decay: 0.5, kickPattern: 2, scale: [130.81, 146.83, 164.81, 174.61, 196.00, 220.00, 246.94, 261.63] },
+            { name: "Bass", wave: "triangle", filterMax: 500, decay: 0.4, kickPattern: 0.5, scale: [65.41, 77.78, 87.31, 98.00, 116.54, 130.81, 155.56, 174.61] },
+            { name: "Melodic", wave: "sine", filterMax: 2000, decay: 0.6, kickPattern: 0, scale: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25] }
+        ];
+
+        let currentStyleIdx = 0;
+        let noteIndex = 0;
+        let nextBeatTime = 0;
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = 0.6;
+            masterGain.connect(audioCtx.destination);
+            delayNode = audioCtx.createDelay();
+            delayNode.delayTime.value = 0.3;
+            delayFeedback = audioCtx.createGain();
+            delayFeedback.gain.value = 0.3;
+            delayNode.connect(delayFeedback);
+            delayFeedback.connect(delayNode);
+            delayNode.connect(masterGain);
+        }
+
+        function playSynthNote() {
+            if (isMuted || !audioCtx) return;
+            const style = musicStyles[currentStyleIdx];
+            if (!style) return;
+            const now = audioCtx.currentTime;
+
+            const playFreq = (freq, startTime, volMultiplier = 1.0) => {
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(Math.min(500 + (combo * 200), style.filterMax), startTime);
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(0.4 * volMultiplier, startTime + 0.02);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + style.decay);
+                filter.connect(gainNode);
+                gainNode.connect(masterGain);
+                gainNode.connect(delayNode);
+                const osc = audioCtx.createOscillator();
+                osc.type = style.wave === 'supersaw' ? 'sawtooth' : style.wave;
+                osc.frequency.setValueAtTime(freq, startTime);
+                osc.connect(filter);
+                osc.start(startTime);
+                osc.stop(startTime + style.decay);
+            };
+
+            const baseFreq = style.scale[noteIndex];
+            noteIndex = (noteIndex + 1) % style.scale.length;
+            if(Math.random() > 0.8) noteIndex = Math.floor(Math.random() * style.scale.length);
+
+            playFreq(baseFreq, now, 1.0);
+
+            if (combo >= 10) playFreq(style.scale[(noteIndex + 2) % style.scale.length], now, 0.6);
+            if (combo >= 20) playFreq(baseFreq * 2, now + 0.15, 0.4);
+            if (combo >= 30) playFreq(baseFreq / 2, now, 0.7);
+        }
+
+        function playKickDrum() {
+            if (isMuted || !audioCtx || combo === 0) return;
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(masterGain);
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.5);
+            gain.gain.setValueAtTime(0.6, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+            osc.start(now); osc.stop(now + 0.5);
+
+            if (typeof playerModel !== 'undefined') playerModel.scale.set(1.4, 1.4, 1.4);
+            dirLight.intensity = 3.0;
+
+            cameraShake = 0.5 + (speedMultiplier * 0.15);
+        }
+
+        function playMissSound() {
+            if (isMuted || !audioCtx) return;
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(10, now + 0.5);
+            gain.gain.setValueAtTime(0.4, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            osc.connect(gain);
+            gain.connect(masterGain);
+            osc.start(now);
+            osc.stop(now + 0.5);
+        }
+
+        async function triggerAIPerformanceCoach(comboAmount) {
+            const msgEl = document.getElementById('coach-msg');
+            if (!msgEl) return;
+
+            if (comboAmount > 30) {
+                try {
+                    const prompt = `The player just tragically broke an epic rhythm game combo of ${comboAmount}. Write a dramatic 3-line haiku about this failure. Return ONLY the 3 lines.`;
+                    const haiku = await callGemini(prompt);
+                    msgEl.innerHTML = haiku.replace(/\n/g, '<br>');
+                    msgEl.style.color = '#fff';
+                    msgEl.style.opacity = 1;
+                    speakText("Combo broken. " + haiku, "Zephyr");
+                    setTimeout(() => msgEl.style.opacity = 0, 6000);
+                } catch(e) {}
+            } else {
+                msgEl.innerText = comboAmount > 10 ? "Nice run!" : "Don't lose the rhythm!";
+                msgEl.style.color = 'var(--secondary-color)';
+                msgEl.style.opacity = 1;
+                setTimeout(() => msgEl.style.opacity = 0, 3000);
+            }
+        }
+
+        async function triggerAIMotivation(currentCombo) {
+            try {
+                const prompt = `The player just hit an amazing continuous combo of ${currentCombo} in a futuristic high-speed rhythm game. Generate a short, punchy, aggressive 2-5 word motivational phrase. Sound like an intense female AI military copilot. Do not include quotes.`;
+                const motivation = await callGemini(prompt);
+                const msgEl = document.getElementById('coach-msg');
+                if (msgEl) {
+                    msgEl.innerText = motivation;
+                    msgEl.style.color = 'var(--primary-color)';
+                    msgEl.style.opacity = 1;
+                    speakText(motivation, "Aoede");
+                    setTimeout(() => { if(msgEl.innerText === motivation) msgEl.style.opacity = 0; }, 3500);
+                }
+            } catch(e) {}
+        }
+
+        async function triggerInvasion() {
+            isInvasionActive = true;
+            try {
+                const prompt = "You are a rogue AI hacking into a neon rhythm game. Generate a 1-sentence villainous taunt (under 10 words) indicating you are taking over.";
+                const taunt = await callGemini(prompt);
+
+                const tBox = document.getElementById('transmission-box');
+                document.getElementById('transmission-text').innerText = taunt;
+                tBox.style.display = 'block';
+
+                speakText(taunt, "Fenrir");
+
+                gridHelper.material.color.setHex(0xff0000);
+                playerModel.material.emissive.setHex(0xff0000);
+                dirLight.color.setHex(0xff0000);
+                scene.fog.color.setHex(0x330000);
+                cameraShake = 1.0;
+
+                setTimeout(() => {
+                    tBox.style.display = 'none';
+                    if (gameActive && isInvasionActive) {
+                        gridHelper.material.color.set(currentTheme.gridColor);
+                        playerModel.material.emissive.set(currentTheme.gridColor);
+                        dirLight.color.set(currentTheme.lightColor);
+                        scene.fog.color.set(currentTheme.fogColor);
+                    }
+                    isInvasionActive = false;
+                }, 6000);
+            } catch(e) {
+                isInvasionActive = false;
+            }
+        }
+
+        async function callGemini(prompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+            const data = await response.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        }
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x050510, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 12);
+        camera.lookAt(0, 0, -20);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        const gridHelper = new THREE.GridHelper(200, 100, 0x00ffff, 0x002244);
+        gridHelper.position.y = -2;
+        scene.add(gridHelper);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xff00ff, 1.5);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        const balls = [], particles = [];
+        const mouse = new THREE.Vector2(), raycaster = new THREE.Raycaster();
+        const interactionZ = 8;
+        const hitPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -interactionZ);
+
+        const playerGeometry = new THREE.SphereGeometry(0.3, 32, 32);
+        const playerMaterial = new THREE.MeshPhongMaterial({
+            color: 0xffffff,
+            emissive: 0x00ffff,
+            emissiveIntensity: 0.8,
+            shininess: 100
+        });
+        const playerModel = new THREE.Mesh(playerGeometry, playerMaterial);
+        scene.add(playerModel);
+
+        const trailParticles = [];
+        const envGroup = new THREE.Group();
+        scene.add(envGroup);
+        const envObjects = [];
+
+        function buildEnvironment(type, colorHex) {
+            while(envGroup.children.length > 0){ envGroup.remove(envGroup.children[0]); }
+            envObjects.length = 0;
+            const color = new THREE.Color(colorHex);
+
+            if (type === 'city') {
+                const boxGeo = new THREE.BoxGeometry(3, 1, 3);
+                const mat = new THREE.MeshPhongMaterial({ color, transparent: true, opacity: 0.8, wireframe: true });
+                for (let i = 0; i < 60; i++) {
+                    const height = Math.random() * 20 + 5;
+                    const mesh = new THREE.Mesh(boxGeo, mat);
+                    mesh.scale.y = height;
+                    mesh.position.x = (Math.random() > 0.5 ? 1 : -1) * (Math.random() * 40 + 15);
+                    mesh.position.y = (height / 2) - 2;
+                    mesh.position.z = (Math.random() - 0.5) * 200;
+                    envGroup.add(mesh);
+                    envObjects.push(mesh);
+                }
+            } else if (type === 'stars') {
+                const starGeo = new THREE.BufferGeometry();
+                const starCount = 2000;
+                const posArray = new Float32Array(starCount * 3);
+                for(let i = 0; i < starCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 300;
+                starGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+                envGroup.add(new THREE.Points(starGeo, new THREE.PointsMaterial({size: 0.5, color})));
+            }
+        }
+
+        const ballGeometry = new THREE.SphereGeometry(1.95, 24, 24);
+
+        function createExplosion(position, color) {
+            const pMat = new THREE.MeshBasicMaterial({ color });
+            for (let i = 0; i < 10; i++) {
+                const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), pMat);
+                p.position.copy(position);
+                p.velocity = new THREE.Vector3((Math.random()-0.5)*3, (Math.random()-0.5)*3, (Math.random()-0.5)*3);
+                p.life = 1.0;
+                scene.add(p);
+                particles.push(p);
+            }
+        }
+
+        function spawnBall() {
+            if (!gameActive) return;
+            const color = new THREE.Color().setHSL(Math.random(), 1, 0.6);
+            const ball = new THREE.Mesh(ballGeometry, new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.6, shininess: 100 }));
+            ball.position.set((Math.random() - 0.5) * Math.max(10, 30 - (combo * 0.2)), 0, -120);
+            ball.userData = { hit: false, color };
+            scene.add(ball);
+            balls.push(ball);
+        }
+
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1, bitsPerSample = 16;
+            const buffer = new ArrayBuffer(44 + pcmData.length);
+            const view = new DataView(buffer);
+            const writeStr = (o, s) => { for (let i=0; i<s.length; i++) view.setUint8(o+i, s.charCodeAt(i)); };
+            writeStr(0, 'RIFF'); view.setUint32(4, 36 + pcmData.length, true);
+            writeStr(8, 'WAVE'); writeStr(12, 'fmt '); view.setUint32(16, 16, true);
+            view.setUint16(20, 1, true); view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate*2, true);
+            view.setUint16(32, 2, true); view.setUint16(34, bitsPerSample, true);
+            writeStr(36, 'data'); view.setUint32(40, pcmData.length, true);
+            new Uint8Array(buffer, 44).set(new Uint8Array(pcmData));
+            return buffer;
+        }
+
+        async function speakText(text, voice = currentTheme.voiceName) {
+            if (isMuted || !audioCtx) return;
+            try {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+                const response = await fetch(url, { method: 'POST', body: JSON.stringify({
+                    contents: [{ parts: [{ text: `Say with extreme hype: ${text}` }] }],
+                    generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+                    model: "gemini-2.5-flash-preview-tts"
+                }) });
+                const data = await response.json();
+                const inlineData = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+                if (inlineData) {
+                    const sampleRate = parseInt(inlineData.mimeType.match(/rate=(\d+)/)?.[1] || 24000);
+                    const binaryStr = atob(inlineData.data);
+                    const pcmData = new Uint8Array(binaryStr.length);
+                    for (let i = 0; i < binaryStr.length; i++) pcmData[i] = binaryStr.charCodeAt(i);
+                    const audioBuffer = await audioCtx.decodeAudioData(pcmToWav(pcmData.buffer, sampleRate));
+                    const source = audioCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(audioCtx.destination);
+                    source.start();
+                }
+            } catch(e) {}
+        }
+
+        async function generateTheme(promptIdea) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const response = await fetch(url, { method: 'POST', body: JSON.stringify({
+                contents: [{ parts: [{ text: `Create a game environment based on: "${promptIdea}".` }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            themeName: { type: "STRING" }, fogColor: { type: "STRING" }, gridColor: { type: "STRING" }, lightColor: { type: "STRING" },
+                            envType: { type: "STRING" }, voiceName: { type: "STRING" }, startMsg: { type: "STRING" }, combo10Msg: { type: "STRING" }, combo20Msg: { type: "STRING" }
+                        },
+                        required: ["themeName", "fogColor", "gridColor", "lightColor", "envType", "voiceName", "startMsg", "combo10Msg", "combo20Msg"]
+                    }
+                }
+            }) });
+            const data = await response.json();
+            return JSON.parse(data.candidates[0].content.parts[0].text);
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'm') {
+                currentStyleIdx = (currentStyleIdx + 1) % musicStyles.length;
+                document.getElementById('style-val').innerText = musicStyles[currentStyleIdx].name;
+            }
+            if (e.key === ' ') {
+                isMuted = !isMuted;
+                if(masterGain) masterGain.gain.setValueAtTime(isMuted ? 0 : 0.6, audioCtx.currentTime);
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function startGame() {
+            initAudio();
+            document.getElementById('start-screen').style.opacity = '0';
+            document.getElementById('theme-display').innerText = `THEME: ${currentTheme.name.toUpperCase()}`;
+            document.getElementById('theme-display').style.display = 'block';
+            buildEnvironment(currentTheme.envType, currentTheme.gridColor);
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                gameActive = true;
+                spawnBall();
+                speakText(currentTheme.startMsg);
+            }, 500);
+        }
+
+        document.getElementById('btn-start-default').addEventListener('click', startGame);
+
+        document.getElementById('btn-generate').addEventListener('click', async () => {
+            const input = document.getElementById('theme-input').value.trim();
+            if (!input) return;
+            document.getElementById('btn-generate').disabled = true;
+            document.getElementById('loading-text').style.display = 'block';
+            try {
+                currentTheme = await generateTheme(input);
+                document.documentElement.style.setProperty('--primary-color', currentTheme.gridColor);
+                document.documentElement.style.setProperty('--secondary-color', currentTheme.lightColor);
+                scene.fog.color.set(currentTheme.fogColor);
+                scene.background = new THREE.Color(currentTheme.fogColor);
+                gridHelper.material.color.set(currentTheme.gridColor);
+                dirLight.color.set(currentTheme.lightColor);
+                startGame();
+            } catch (e) { startGame(); }
+        });
+
+        let lastSpawnTime = 0;
+        function animate(time) {
+            requestAnimationFrame(animate);
+            if (!gameActive) {
+                if(currentTheme.envType === 'stars') envGroup.rotation.y += 0.001;
+                renderer.render(scene, camera);
+                return;
+            }
+
+            speedMultiplier = Math.min(1.0 + (combo * 0.08), 4.0);
+            const moveSpeed = baseSpeed * speedMultiplier;
+            gridHelper.position.z = (gridHelper.position.z + moveSpeed) % 20;
+
+            if (currentTheme.envType === 'city') {
+                envObjects.forEach(o => { o.position.z += moveSpeed * 0.5; if (o.position.z > 20) o.position.z = -180; });
+            }
+
+            if (audioCtx && !isMuted && combo > 0) {
+                const interval = 1.0 / (speedMultiplier * musicStyles[currentStyleIdx].kickPattern);
+                if (audioCtx.currentTime >= nextBeatTime) { playKickDrum(); nextBeatTime = audioCtx.currentTime + interval; }
+            }
+
+            if (time - lastSpawnTime > Math.max(150, 1200 - (speedMultiplier * 250))) { spawnBall(); lastSpawnTime = time; }
+
+            raycaster.setFromCamera(mouse, camera);
+            const target = new THREE.Vector3();
+            raycaster.ray.intersectPlane(hitPlane, target);
+
+            if (target) {
+                playerModel.position.lerp(target, 0.9);
+                playerModel.rotation.x += 0.02 * speedMultiplier;
+                playerModel.rotation.y += 0.03 * speedMultiplier;
+
+                const targetCamX = target.x * 0.15;
+                const targetCamY = (target.y * 0.15) + 5;
+                currentCamX += (targetCamX - currentCamX) * 0.1;
+                currentCamY += (targetCamY - currentCamY) * 0.1;
+
+                let shakeX = 0;
+                let shakeY = 0;
+                if (cameraShake > 0.01) {
+                    shakeX = (Math.random() - 0.5) * cameraShake;
+                    shakeY = (Math.random() - 0.5) * cameraShake;
+                    cameraShake *= 0.85;
+                }
+
+                camera.position.x = currentCamX + shakeX;
+                camera.position.y = currentCamY + shakeY;
+                camera.lookAt(0, 0, -20);
+
+                if (Math.random() > 0.3) {
+                    const tMat = new THREE.MeshBasicMaterial({ color: playerMaterial.emissive, transparent: true, opacity: 0.6 });
+                    const t = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), tMat);
+                    t.position.copy(playerModel.position);
+                    t.life = 1.0;
+                    scene.add(t);
+                    trailParticles.push(t);
+                }
+            }
+
+            playerModel.scale.lerp(new THREE.Vector3(1, 1, 1), 0.15);
+            dirLight.intensity += (1.5 - dirLight.intensity) * 0.15;
+            if (currentTheme.gridColor) playerMaterial.emissive.set(currentTheme.gridColor);
+
+            for (let i = balls.length - 1; i >= 0; i--) {
+                const ball = balls[i];
+                ball.position.z += moveSpeed;
+                ball.position.y = Math.sin(time * 0.005 * speedMultiplier + ball.position.x) * 2;
+
+                if (!ball.userData.hit) {
+                    const zDistToPlane = ball.position.z - interactionZ;
+                    if (zDistToPlane > -3.0 - (moveSpeed * 2) && zDistToPlane < 2.0) {
+                        const dx = ball.position.x - target.x;
+                        const dy = ball.position.y - target.y;
+                        const xyDist = Math.sqrt(dx*dx + dy*dy);
+                        if (xyDist < 2.5) {
+                            ball.userData.hit = true;
+                            score += 10 + combo; combo++;
+                            playSynthNote();
+                            document.getElementById('score-val').innerText = score;
+                            document.getElementById('combo-val').innerText = combo;
+                            document.getElementById('speed-val').innerText = speedMultiplier.toFixed(1) + 'x';
+
+                            playerModel.scale.set(1.8, 1.8, 1.8);
+
+                            if (combo > 0 && combo % 15 === 0) {
+                                triggerAIMotivation(combo);
+                            }
+
+                            if (combo === 35 && !isInvasionActive) {
+                                triggerInvasion();
+                            }
+
+                            createExplosion(ball.position, ball.userData.color);
+                            scene.remove(ball);
+                            balls.splice(i, 1);
+                            continue;
+                        }
+                    }
+                }
+
+                if (ball.position.z > interactionZ + 2) {
+                    if (combo > 5) triggerAIPerformanceCoach(combo);
+                    combo = 0; speedMultiplier = 1.0; playMissSound();
+
+                    if (isInvasionActive) {
+                        gridHelper.material.color.set(currentTheme.gridColor);
+                        playerModel.material.emissive.set(currentTheme.gridColor);
+                        dirLight.color.set(currentTheme.lightColor);
+                        scene.fog.color.set(currentTheme.fogColor);
+                        document.getElementById('transmission-box').style.display = 'none';
+                        isInvasionActive = false;
+                    }
+
+                    document.getElementById('combo-val').innerText = 0;
+                    scene.remove(ball); balls.splice(i, 1);
+                }
+            }
+
+            particles.forEach((p, i) => {
+                p.position.add(p.velocity); p.life -= 0.03; p.scale.setScalar(Math.max(0, p.life));
+                if (p.life <= 0) { scene.remove(p); particles.splice(i, 1); }
+            });
+
+            trailParticles.forEach((t, i) => {
+                t.life -= 0.05;
+                t.scale.setScalar(Math.max(0, t.life));
+                t.position.z += moveSpeed * 0.5;
+                if (t.life <= 0) { scene.remove(t); trailParticles.splice(i, 1); }
+            });
+
+            renderer.render(scene, camera);
+        }
+        buildEnvironment('city', 0x00ffff);
+        animate(0);
+    </script>
+</body>
+</html>
