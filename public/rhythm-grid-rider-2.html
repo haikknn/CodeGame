@@ -644,7 +644,8 @@
         function startGame() {
             initAudio();
             document.getElementById('start-screen').style.opacity = '0';
-            document.getElementById('theme-display').innerText = `THEME: ${currentTheme.name.toUpperCase()}`;
+            const themeLabel = currentTheme.name || currentTheme.themeName || 'Neon Circuit';
+            document.getElementById('theme-display').innerText = `THEME: ${themeLabel.toUpperCase()}`;
             document.getElementById('theme-display').style.display = 'block';
             buildEnvironment(currentTheme.envType, currentTheme.gridColor);
             setTimeout(() => {
@@ -663,7 +664,8 @@
             document.getElementById('btn-generate').disabled = true;
             document.getElementById('loading-text').style.display = 'block';
             try {
-                currentTheme = await generateTheme(input);
+                const generatedTheme = await generateTheme(input);
+                currentTheme = { ...generatedTheme, name: generatedTheme.themeName || generatedTheme.name || 'Neon Circuit' };
                 document.documentElement.style.setProperty('--primary-color', currentTheme.gridColor);
                 document.documentElement.style.setProperty('--secondary-color', currentTheme.lightColor);
                 scene.fog.color.set(currentTheme.fogColor);
