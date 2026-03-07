@@ -641,9 +641,23 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        function normalizeTheme(theme) {
+            const fallbackTheme = {
+                ...defaultTheme,
+                name: defaultTheme.name || defaultTheme.themeName || 'Neon Circuit'
+            };
+            if (!theme || typeof theme !== 'object') return fallbackTheme;
+            return {
+                ...fallbackTheme,
+                ...theme,
+                name: theme.name || theme.themeName || fallbackTheme.name
+            };
+        }
+
         function startGame() {
             initAudio();
             document.getElementById('start-screen').style.opacity = '0';
+            currentTheme = normalizeTheme(currentTheme);
             const themeLabel = currentTheme.name || currentTheme.themeName || 'Neon Circuit';
             document.getElementById('theme-display').innerText = `THEME: ${themeLabel.toUpperCase()}`;
             document.getElementById('theme-display').style.display = 'block';
@@ -665,7 +679,7 @@
             document.getElementById('loading-text').style.display = 'block';
             try {
                 const generatedTheme = await generateTheme(input);
-                currentTheme = { ...generatedTheme, name: generatedTheme.themeName || generatedTheme.name || 'Neon Circuit' };
+                currentTheme = normalizeTheme(generatedTheme);
                 document.documentElement.style.setProperty('--primary-color', currentTheme.gridColor);
                 document.documentElement.style.setProperty('--secondary-color', currentTheme.lightColor);
                 scene.fog.color.set(currentTheme.fogColor);
@@ -673,7 +687,10 @@
                 gridHelper.material.color.set(currentTheme.gridColor);
                 dirLight.color.set(currentTheme.lightColor);
                 startGame();
-            } catch (e) { startGame(); }
+            } catch (e) {
+                currentTheme = normalizeTheme(defaultTheme);
+                startGame();
+            }
         });
 
         let lastSpawnTime = 0;
