@@ -2,6 +2,9 @@ node_modules
 npm-debug.log
 
 public
+!public/
+public/*
+!public/rhythm-grid-rider-2.html
 
 config/*
 !config/_sample.json
