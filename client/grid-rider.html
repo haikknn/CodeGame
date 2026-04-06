@@ -1,0 +1,2500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>GRID RIDER 2.0 OVERDRIVE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+:root {
+  --cyan: #00f5d4;
+  --pink: #f72585;
+  --yellow: #ffd60a;
+  --purple: #7209b7;
+  --blue: #3a86ff;
+  --bg: #05050f;
+  --panel: rgba(5, 5, 20, 0.84);
+  --border: rgba(0, 245, 212, 0.2);
+  --shadow-c: 0, 245, 212;
+  --shadow-p: 247, 37, 133;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; width: 100%; height: 100%; overflow: hidden;
+  background: #030308; color: white; font-family: 'Rajdhani', sans-serif;
+  user-select: none; touch-action: none; cursor: crosshair;
+}
+
+#canvas-container, #fx-layer, #ui-layer, #start-screen, #mission-report, #pause-menu, #genre-menu, #audio-menu, #custom-menu, #achievements-menu {
+  position: absolute; inset: 0;
+}
+
+#canvas-container { z-index: 1; }
+#fx-layer { z-index: 5; pointer-events: none; }
+#ui-layer { z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 20px; }
+#ui-layer * { pointer-events: auto; }
+#start-screen { z-index: 30; display: flex; align-items: center; justify-content: center; }
+#mission-report { z-index: 60; display: none; }
+#pause-menu { z-index: 55; display: none; }
+#genre-menu { z-index: 50; display: none; }
+#audio-menu { z-index: 52; display: none; }
+#custom-menu { z-index: 53; display: none; }
+#achievements-menu { z-index: 54; display: none; }
+
+#crt-overlay {
+  position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,0.01) 0px, rgba(0,0,0,0.1) 2px, transparent 3px);
+  z-index: 20; mix-blend-mode: overlay;
+  animation: scanlines 8s linear infinite;
+}
+
+@keyframes scanlines {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(20px); }
+}
+
+#vignette {
+  position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle at center, transparent 30%, rgba(0,0,0,0.85) 100%);
+  z-index: 21;
+}
+
+#hit-flash {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0; z-index: 25; background: white; transition: opacity 0.1s;
+}
+
+#beat-flash {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0; z-index: 24;
+  background: radial-gradient(circle at center, rgba(0, 245, 212, 0.2) 0%, transparent 70%);
+  transition: opacity 0.1s;
+}
+
+#chromatic-aberration {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0; z-index: 22;
+  background: radial-gradient(circle at center, transparent 60%, rgba(0, 245, 212, 0.1) 100%);
+  mix-blend-mode: screen;
+  transition: opacity 0.2s;
+}
+
+#combo-glow {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: 0; z-index: 23;
+  background: radial-gradient(circle at center, rgba(255, 214, 10, 0.15) 0%, transparent 70%);
+  transition: opacity 0.3s;
+}
+
+#speed-lines {
+  position: absolute; inset: 0; pointer-events: none;
+  z-index: 24; opacity: 0;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(0, 245, 212, 0.05) 50%, transparent 100%),
+    linear-gradient(270deg, transparent 0%, rgba(247, 37, 133, 0.05) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: speedLines 0.5s linear infinite;
+  transition: opacity 0.3s;
+}
+
+@keyframes speedLines {
+  0% { background-position: 0% 0%, 100% 0%; }
+  100% { background-position: 200% 0%, -100% 0%; }
+}
+
+.hud-panel {
+  padding: 12px 18px;
+  background: rgba(10, 15, 30, 0.4);
+  backdrop-filter: blur(15px);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(0, 245, 212, 0.1);
+  transition: box-shadow 0.3s;
+}
+
+.hud-panel.beat-pulse {
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 40px rgba(0, 245, 212, 0.5);
+  animation: beatPulse 0.2s ease-out;
+}
+
+@keyframes beatPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+.top-hud { display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px; align-items: start; }
+
+.hud-left { clip-path: polygon(0 0, 100% 0, 85% 100%, 0 100%); }
+.hud-right { clip-path: polygon(15% 0, 100% 0, 100% 100%, 0 100%); text-align: right; }
+
+.hud-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 32px;
+  color: var(--cyan);
+  text-shadow: 0 0 10px var(--cyan), 0 0 20px var(--cyan);
+  line-height: 1;
+}
+
+.hud-label { font-family: 'Space Mono', monospace; font-size: 9px; text-transform: uppercase; opacity: 0.5; letter-spacing: 2px; }
+
+#combo-core { width: 100px; height: 100px; position: relative; margin: 0 auto; }
+#combo-core svg { transform: rotate(-90deg); filter: drop-shadow(0 0 10px rgba(247, 37, 133, 0.5)); }
+#combo-ring-fill { stroke: var(--pink); stroke-dasharray: 302; stroke-dashoffset: 302; transition: stroke-dashoffset 0.3s; }
+#combo-number { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 36px; }
+
+.lives-row { display: flex; gap: 5px; margin-top: 8px; }
+.life-pip {
+  width: 18px; height: 6px;
+  background: var(--cyan);
+  border-radius: 1px;
+  transition: 0.3s;
+  box-shadow: 0 0 10px var(--cyan);
+}
+.life-pip.empty { background: rgba(255,255,255,0.1); box-shadow: none; }
+
+.bar-track { width: 100%; height: 4px; background: rgba(255,255,255,0.1); margin-top: 5px; border-radius: 2px; overflow: hidden; }
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--cyan);
+  transition: width 0.3s;
+  box-shadow: 0 0 10px var(--cyan);
+}
+
+#beat-indicator {
+  position: absolute;
+  right: 20px;
+  top: 200px;
+  width: 60px;
+  height: 60px;
+  border: 2px solid var(--cyan);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+#beat-indicator.beat {
+  animation: beatPulseIndicator 0.2s ease-out;
+  background: rgba(0, 245, 212, 0.3);
+  box-shadow: 0 0 30px rgba(0, 245, 212, 0.6);
+}
+
+@keyframes beatPulseIndicator {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+#beat-meter {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--cyan);
+  opacity: 0.3;
+  transition: opacity 0.1s, transform 0.1s;
+}
+
+#beat-meter.active {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.menu-card {
+  width: min(90vw, 600px);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 40px;
+  text-align: center;
+  background: linear-gradient(135deg, rgba(15,20,40,0.95), rgba(5,5,15,0.98));
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 50px rgba(0,245,212,0.3), inset 0 0 30px rgba(0,245,212,0.05);
+  border-radius: 8px;
+}
+
+h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(50px, 10vw, 90px);
+  margin: 0;
+  letter-spacing: 8px;
+  background: linear-gradient(to bottom, #fff, var(--cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 20px rgba(0, 245, 212, 0.5));
+}
+
+
+.btn-main {
+  width: 100%; padding: 16px; margin-top: 20px;
+  background: linear-gradient(90deg, var(--cyan), var(--purple));
+  border: none; font-family: 'Bebas Neue', sans-serif; color: white;
+  font-size: 24px; cursor: pointer; transition: 0.2s; letter-spacing: 2px;
+  box-shadow: 0 0 20px rgba(0, 245, 212, 0.3);
+  border-radius: 4px;
+}
+.btn-main:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.2); 
+  box-shadow: 0 10px 20px rgba(0,245,212,0.4), 0 0 30px rgba(0,245,212,0.3); 
+}
+
+.btn-secondary {
+  width: 100%; padding: 12px; margin-top: 15px;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.3);
+  font-family: 'Bebas Neue', sans-serif; color: white;
+  font-size: 18px; cursor: pointer; transition: 0.2s; letter-spacing: 2px;
+  border-radius: 4px;
+}
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: var(--cyan);
+}
+
+.world-panel { margin-top: 25px; padding: 20px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 4px; }
+.world-input { width: 100%; padding: 12px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: white; font-family: 'Space Mono'; margin-bottom: 10px; border-radius: 4px; }
+
+.audio-upload-zone {
+  margin-top: 20px;
+  padding: 30px;
+  border: 2px dashed var(--cyan);
+  border-radius: 8px;
+  background: rgba(0, 245, 212, 0.05);
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.audio-upload-zone:hover {
+  background: rgba(0, 245, 212, 0.1);
+  border-color: var(--pink);
+}
+
+.audio-upload-zone.has-file {
+  border-color: var(--pink);
+  background: rgba(247, 37, 133, 0.1);
+}
+
+#audio-file-input {
+  display: none;
+}
+
+.upload-icon {
+  font-size: 48px;
+  margin-bottom: 10px;
+}
+
+.upload-text {
+  font-family: 'Space Mono', monospace;
+  font-size: 14px;
+  color: var(--cyan);
+}
+
+.file-info {
+  margin-top: 10px;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--pink);
+}
+
+.volume-section {
+  margin-top: 25px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.03);
+  border-radius: 4px;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.volume-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  min-width: 120px;
+  text-align: left;
+  color: var(--cyan);
+}
+
+.volume-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  outline: none;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--cyan);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--cyan);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--cyan);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--cyan);
+  border: none;
+}
+
+.volume-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  min-width: 50px;
+  color: var(--cyan);
+  text-align: right;
+}
+
+.genre-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.genre-btn {
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.3s;
+  text-align: center;
+}
+
+.genre-btn:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 245, 212, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(0, 245, 212, 0.3);
+}
+
+.genre-btn.selected {
+  border-color: var(--pink);
+  background: rgba(247, 37, 133, 0.2);
+  box-shadow: 0 0 30px rgba(247, 37, 133, 0.4);
+}
+
+.genre-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 24px;
+  color: var(--cyan);
+  margin-bottom: 5px;
+}
+
+.genre-desc {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+.achievement-card {
+  padding: 15px;
+  margin: 10px 0;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: 4px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: 0.3s;
+}
+
+.achievement-card.unlocked {
+  border-left-color: var(--cyan);
+  background: rgba(0, 245, 212, 0.1);
+  box-shadow: 0 0 15px rgba(0, 245, 212, 0.2);
+}
+
+.achievement-icon {
+  font-size: 32px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.achievement-info {
+  flex: 1;
+  text-align: left;
+}
+
+.achievement-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  color: var(--cyan);
+  margin-bottom: 3px;
+}
+
+.achievement-desc {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.achievement-card.unlocked .achievement-icon {
+  filter: drop-shadow(0 0 5px var(--cyan));
+}
+
+#perfect-ring {
+
+  position: absolute; width: 180px; height: 180px; 
+  border: 2px solid rgba(0,245,212,0.3);
+  border-radius: 50%; transform: translate(-50%, -50%); opacity: 0; pointer-events: none;
+  box-shadow: 0 0 20px rgba(0,245,212,0.3), inset 0 0 20px rgba(0,245,212,0.1);
+}
+
+#perfect-ring.beat-sync {
+  border-color: var(--yellow);
+  box-shadow: 0 0 30px rgba(255, 214, 10, 0.6), inset 0 0 30px rgba(255, 214, 10, 0.2);
+  animation: ringPulseBeat 0.2s ease-out;
+}
+
+@keyframes ringPulseBeat {
+  0% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.15); }
+  100% { transform: translate(-50%, -50%) scale(1); }
+}
+
+.hit-text {
+  position: absolute; font-family: 'Bebas Neue', sans-serif; font-size: 32px;
+  pointer-events: none; animation: hitFloat 0.7s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  text-shadow: 0 0 10px currentColor;
+}
+
+@keyframes hitFloat {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translate(-50%, -180%) scale(1.3); opacity: 0; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(400px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(400px); opacity: 0; }
+}
+
+#controls-hint {
+  text-align: center; font-family: 'Space Mono'; font-size: 10px; color: rgba(255,255,255,0.3);
+}
+
+kbd { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); }
+
+#genre-display {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 12px 24px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid var(--cyan);
+  border-radius: 4px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  color: var(--cyan);
+  opacity: 0;
+  transition: opacity 0.3s;
+  box-shadow: 0 0 20px rgba(0, 245, 212, 0.4);
+  text-shadow: 0 0 10px var(--cyan);
+}
+
+#mobile-controls { display: none; gap: 10px; padding: 10px; justify-content: center; }
+.action-btn { 
+  width: 60px; height: 60px; border-radius: 50%; 
+  background: rgba(255,255,255,0.15); 
+  border: 1px solid white; 
+  color: white; display: flex; align-items: center; justify-content: center; 
+  font-size: 10px;
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+.leaderboard-panel {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.03);
+  text-align: left;
+}
+
+.leaderboard-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 2px;
+  color: var(--yellow);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  margin-top: 6px;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.28);
+  border: 1px solid rgba(255,255,255,0.08);
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+}
+
+.score-rank {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: var(--cyan);
+}
+
+#powerup-hud {
+  position: absolute;
+  left: 20px;
+  bottom: 90px;
+  width: 280px;
+  z-index: 15;
+}
+
+.powerup-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.powerup-chip {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(8,12,24,0.7);
+  border: 1px solid rgba(0,245,212,0.2);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 20px rgba(0,245,212,0.08);
+}
+
+.powerup-icon {
+  font-size: 18px;
+}
+
+.powerup-name {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 1px;
+  font-size: 18px;
+  color: var(--cyan);
+}
+
+.powerup-time {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--yellow);
+}
+
+@media (max-width: 768px) {
+  #mobile-controls { display: flex; }
+  .top-hud { grid-template-columns: 1fr 1fr; }
+  #combo-container { grid-column: span 2; order: -1; }
+  #controls-hint { display: none; }
+  .genre-grid { grid-template-columns: 1fr 1fr; }
+  #powerup-hud { width: calc(100vw - 40px); bottom: 120px; }
+}
+</style>
+</head>
+<body>
+
+<div id="canvas-container"></div>
+
+<div id="fx-layer">
+  <div id="crt-overlay"></div>
+  <div id="vignette"></div>
+  <div id="hit-flash"></div>
+  <div id="beat-flash"></div>
+  <div id="chromatic-aberration"></div>
+  <div id="combo-glow"></div>
+  <div id="speed-lines"></div>
+  <div id="perfect-ring"></div>
+</div>
+
+<div id="ui-layer">
+  <div class="top-hud">
+    <div class="hud-panel hud-left" id="score-panel">
+      <div class="hud-label">Score</div>
+      <div id="score-val" class="hud-value">0</div>
+      <div class="lives-row">
+        <div class="life-pip" id="p-1"></div>
+        <div class="life-pip" id="p-2"></div>
+        <div class="life-pip" id="p-3"></div>
+      </div>
+    </div>
+
+    <div id="combo-container">
+      <div id="combo-core">
+        <svg viewBox="0 0 110 110" width="100%" height="100%">
+          <circle cx="55" cy="55" r="48" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="4"></circle>
+          <circle id="combo-ring-fill" cx="55" cy="55" r="48" fill="none" stroke-width="4" stroke-linecap="round"></circle>
+        </svg>
+        <div id="combo-number" class="hud-value">0</div>
+      </div>
+      <div id="sync-tier" class="hud-label" style="text-align:center; margin-top:5px; color:var(--cyan)">SYNC: BASE</div>
+    </div>
+
+    <div class="hud-panel hud-right">
+      <div class="hud-label">Speed</div>
+      <div id="speed-val" class="hud-value">1.0x</div>
+      <div class="bar-track"><div id="speed-bar" class="bar-fill"></div></div>
+      <div class="hud-label" style="margin-top:8px">Pulse</div>
+      <div class="bar-track"><div id="pulse-bar" class="bar-fill" style="background:var(--yellow)"></div></div>
+    </div>
+  </div>
+
+  <div id="beat-indicator">
+    <div id="beat-meter"></div>
+  </div>
+
+  <div id="powerup-hud">
+    <div class="powerup-stack" id="powerup-stack"></div>
+  </div>
+
+  <div id="bottom-ui">
+    <div id="genre-display">GENRE: TECHNO</div>
+    <div id="controls-hint">
+      <kbd>MUIS</kbd> BEWEEG &nbsp; <kbd>LMB</kbd> BOOST VOORUIT &nbsp; <kbd>Q</kbd> PULSE &nbsp; <kbd>M</kbd> VARIANT &nbsp; <kbd>G</kbd> WISSEL GENRE &nbsp; <kbd>A</kbd> AUDIO &nbsp; <kbd>P</kbd> PAUZE
+    </div>
+    <div id="mobile-controls">
+      <div class="action-btn" id="m-pulse">PULSE</div>
+      <div class="action-btn" id="m-genre">GENRE</div>
+      <div class="action-btn" id="m-pause">PAUSE</div>
+    </div>
+  </div>
+</div>
+
+<div id="start-screen">
+  <div class="menu-card">
+    <h1>GRID RIDER</h1>
+    <p style="opacity: 0.5; letter-spacing: 2px;">BEAT REACTIVE OVERDRIVE</p>
+    
+    <div class="world-panel">
+      <div class="hud-label" style="margin-bottom:10px">AI World Generator</div>
+      <input type="text" id="theme-input" class="world-input" placeholder="bijv. Neon Tokyo, Deep Space, Acid Wasteland...">
+      <button class="btn-main" id="btn-start">GENEREREN & STARTEN</button>
+      <p id="loading-msg" style="display:none; color:var(--cyan); margin-top:10px; font-family:'Space Mono'">Wereld wordt gesynthetiseerd...</p>
+    </div>
+    
+    <button class="btn-secondary" id="btn-default">START MET DEFAULT WERELD</button>
+    <button class="btn-secondary" id="btn-audio-setup">🎵 MUZIEK INSTELLEN</button>
+    <button class="btn-secondary" id="btn-custom-setup">⚙️ AANPASSINGEN</button>
+    <button class="btn-secondary" id="btn-achievements-view">🏆 ACHIEVEMENTS</button>
+
+    <div class="leaderboard-panel">
+      <div class="leaderboard-title">TOP 3 RIDERS</div>
+      <div id="leaderboard-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="audio-menu">
+  <div class="menu-card">
+    <h1 style="font-size:40px">MUZIEK SETUP</h1>
+    
+    <div class="audio-upload-zone" id="upload-zone">
+      <div class="upload-icon">🎵</div>
+      <div class="upload-text">Klik om je eigen muziek te uploaden</div>
+      <div class="upload-text" style="font-size: 11px; opacity: 0.6; margin-top: 5px;">
+        MP3, WAV, OGG • Max 50MB
+      </div>
+      <div class="file-info" id="file-info" style="display: none;"></div>
+    </div>
+    <input type="file" id="audio-file-input" accept="audio/*" />
+    
+    <div class="volume-section">
+      <div class="hud-label" style="margin-bottom:10px">VOLUME CONTROLS</div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Master Volume</div>
+        <input type="range" class="volume-slider" id="vol-master" min="0" max="100" value="80" />
+        <div class="volume-value"><span id="vol-master-val">80</span>%</div>
+      </div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Techno/Epic</div>
+        <input type="range" class="volume-slider" id="vol-drums" min="0" max="100" value="100" />
+        <div class="volume-value"><span id="vol-drums-val">100</span>%</div>
+      </div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Ambient/Spatial</div>
+        <input type="range" class="volume-slider" id="vol-ambient" min="0" max="100" value="100" />
+        <div class="volume-value"><span id="vol-ambient-val">100</span>%</div>
+      </div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Bass/Acid</div>
+        <input type="range" class="volume-slider" id="vol-bass" min="0" max="100" value="100" />
+        <div class="volume-value"><span id="vol-bass-val">100</span>%</div>
+      </div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Lead/Melody</div>
+        <input type="range" class="volume-slider" id="vol-lead" min="0" max="100" value="100" />
+        <div class="volume-value"><span id="vol-lead-val">100</span>%</div>
+      </div>
+    </div>
+    
+    <button class="btn-main" id="btn-audio-close">OPSLAAN & SLUITEN</button>
+  </div>
+</div>
+
+<div id="custom-menu">
+  <div class="menu-card">
+    <h1 style="font-size:40px">AANPASSINGEN</h1>
+    
+    <div class="volume-section">
+      <div class="hud-label" style="margin-bottom:15px">DIFFICULTY</div>
+      <div class="genre-grid" style="grid-template-columns: repeat(3, 1fr);">
+        <div class="genre-btn difficulty-btn" data-difficulty="easy">
+          <div class="genre-title" style="font-size: 20px;">EASY</div>
+          <div class="genre-desc">Relaxed</div>
+        </div>
+        <div class="genre-btn difficulty-btn selected" data-difficulty="normal">
+          <div class="genre-title" style="font-size: 20px;">NORMAL</div>
+          <div class="genre-desc">Balanced</div>
+        </div>
+        <div class="genre-btn difficulty-btn" data-difficulty="hard">
+          <div class="genre-title" style="font-size: 20px;">HARD</div>
+          <div class="genre-desc">Intense</div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="volume-section">
+      <div class="hud-label" style="margin-bottom:10px">GAME SETTINGS</div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Speed Multiplier</div>
+        <input type="range" class="volume-slider" id="setting-speed" min="50" max="150" value="100" />
+        <div class="volume-value"><span id="setting-speed-val">100</span>%</div>
+      </div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Visual Effects</div>
+        <input type="range" class="volume-slider" id="setting-visuals" min="50" max="150" value="100" />
+        <div class="volume-value"><span id="setting-visuals-val">100</span>%</div>
+      </div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Trail Density</div>
+        <input type="range" class="volume-slider" id="setting-trails" min="50" max="200" value="100" />
+        <div class="volume-value"><span id="setting-trails-val">100</span>%</div>
+      </div>
+      
+      <div class="volume-control">
+        <div class="volume-label">Particle Count</div>
+        <input type="range" class="volume-slider" id="setting-particles" min="50" max="150" value="100" />
+        <div class="volume-value"><span id="setting-particles-val">100</span>%</div>
+      </div>
+    </div>
+    
+    <button class="btn-main" id="btn-custom-close">OPSLAAN & SLUITEN</button>
+  </div>
+</div>
+
+<div id="achievements-menu">
+  <div class="menu-card">
+    <h1 style="font-size:40px">ACHIEVEMENTS</h1>
+    <p style="opacity: 0.5; margin-bottom: 20px;">Unlock je prestaties</p>
+    
+    <div id="achievements-list" style="max-height: 60vh; overflow-y: auto;">
+      </div>
+    
+    <button class="btn-main" id="btn-achievements-close">SLUITEN</button>
+  </div>
+</div>
+
+<div id="genre-menu">
+  <div class="menu-card">
+    <h1 style="font-size:40px">MUZIEK GENRE</h1>
+    <p style="opacity: 0.5; margin-bottom: 20px;">Kies je soundtrack stijl</p>
+    
+    <div class="genre-grid">
+      <div class="genre-btn selected" data-genre="techno">
+        <div class="genre-title">TECHNO</div>
+        <div class="genre-desc">Hard, driving beats</div>
+      </div>
+      <div class="genre-btn" data-genre="ambient">
+        <div class="genre-title">AMBIENT</div>
+        <div class="genre-desc">Atmospheric pads</div>
+      </div>
+      <div class="genre-btn" data-genre="spatial">
+        <div class="genre-title">SPATIAL</div>
+        <div class="genre-desc">Cosmic textures</div>
+      </div>
+      <div class="genre-btn" data-genre="epic">
+        <div class="genre-title">EPIC</div>
+        <div class="genre-desc">Cinematic power</div>
+      </div>
+      <div class="genre-btn" data-genre="adventure">
+        <div class="genre-title">ADVENTURE</div>
+        <div class="genre-desc">Heroic melodies</div>
+      </div>
+      <div class="genre-btn" data-genre="synthwave">
+        <div class="genre-title">SYNTHWAVE</div>
+        <div class="genre-desc">Retro neon drive</div>
+      </div>
+      <div class="genre-btn" data-genre="industrial">
+        <div class="genre-title">INDUSTRIAL</div>
+        <div class="genre-desc">Steel impact beats</div>
+      </div>
+      <div class="genre-btn" data-genre="trance">
+        <div class="genre-title">TRANCE</div>
+        <div class="genre-desc">Hypnotic uplift</div>
+      </div>
+      <div class="genre-btn" data-genre="drumstep">
+        <div class="genre-title">DRUMSTEP</div>
+        <div class="genre-desc">Fast break energy</div>
+      </div>
+      <div class="genre-btn" data-genre="custom">
+        <div class="genre-title">CUSTOM</div>
+        <div class="genre-desc">Your music</div>
+      </div>
+    </div>
+    
+    <button class="btn-main" id="btn-genre-confirm" style="margin-top: 30px;">BEVESTIGEN & TERUG</button>
+  </div>
+</div>
+
+<div id="mission-report" style="display: none; align-items: center; justify-content: center;">
+  <div class="menu-card">
+    <h1 style="font-size:40px">EXTRACTION COMPLETE</h1>
+    <div id="final-stats" style="margin:20px 0; color:var(--cyan); font-family:'Space Mono'"></div>
+    <button class="btn-main" id="btn-restart">RE-INITIALISEREN</button>
+  </div>
+</div>
+
+<div id="pause-menu" style="align-items: center; justify-content: center;">
+  <div class="menu-card" style="width:300px">
+    <h1 style="font-size:40px">PAUZE</h1>
+    <button class="btn-main" id="btn-resume">VERDER</button>
+    <button class="btn-secondary" id="btn-genre-menu">🎵 GENRE SELECTIE</button>
+    <button class="btn-secondary" id="btn-audio-pause">🔊 VOLUME</button>
+    <button class="btn-secondary" id="btn-custom-pause">⚙️ AANPASSINGEN</button>
+    <button class="btn-secondary" id="btn-achievements-pause">🏆 ACHIEVEMENTS</button>
+    <button class="btn-main" style="background:var(--pink)" id="btn-quit">QUIT</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const setStyle = (id, prop, val) => { const el = $(id); if (el) el.style[prop] = val; };
+  const setText = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+  const setHTML = (id, val) => { const el = $(id); if (el) el.innerHTML = val; };
+  const setDisplay = (id, val) => { const el = $(id); if (el) el.style.display = val; };
+  const toggleClass = (id, cls, state) => { const el = $(id); if (el) el.classList.toggle(cls, state); };
+  const bindClick = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
+
+  let score = 0;
+  let combo = 0;
+  let speed = 1.0;
+  let lives = 3;
+  let focus = 0;
+  let gameActive = false;
+  let isPaused = false;
+  let currentGenre = 'techno';
+  let customAudioFile = null;
+  let overdriveTime = 0;
+  let lastSpawn = 0;
+  let gameStartTime = 0;
+  let lastBeatVisual = 0;
+  let currentSpawnRateMultiplier = 1;
+  let currentScoreMultiplier = 1;
+  let shieldCharges = 0;
+  let magnetRadius = 0;
+  let orbScaleBoost = 1;
+  let beatBurstChance = 0;
+  let autoPulseEnabled = false;
+  let hyperGlow = 0;
+  let ghostMode = false;
+  let comboDecaySafe = false;
+  let timeWarpFactor = 1;
+  let bonusLifeLock = false;
+  let startSlowUntil = 0;
+  let currentVariation = 0;
+
+  const volumeSettings = { master: 80, drums: 100, ambient: 100, bass: 100, lead: 100 };
+  const genreVariations = {
+    techno: ['DRIVE', 'ACID', 'PERCUSSION'],
+    ambient: ['DRIFT', 'DEEP', 'GLASS'],
+    spatial: ['ORBIT', 'VOID', 'STARLINE'],
+    epic: ['RISE', 'MARCH', 'STORM'],
+    adventure: ['QUEST', 'CHASE', 'SUMMIT'],
+    synthwave: ['SUNSET', 'MIDNIGHT', 'OUTRUN'],
+    industrial: ['STEEL', 'MACHINE', 'CRUSH'],
+    trance: ['LIFT', 'HYPNOTIC', 'EUPHORIA'],
+    drumstep: ['SMASH', 'ROLL', 'SWITCH'],
+    custom: ['CUSTOM', 'CUSTOM', 'CUSTOM']
+  };
+  const gameSettings = {
+    difficulty: 'normal',
+    speedMultiplier: 1.0,
+    visualIntensity: 1.0,
+    trailDensity: 1.0,
+    particleCount: 1.0
+  };
+
+  const BALANCE = {
+    maxSpeed: 2.2,
+    spawnRate: 1100,
+    inputSmoothing: 0.16,
+    spring: 0.09,
+    damping: 0.15,
+    tiltRoll: 0.45,
+    tiltPitch: 0.18,
+    cameraLag: 0.08,
+    cameraLookAhead: 0.18,
+    beatMs: 60000 / 140
+  };
+
+  const achievements = {
+    firstHit: { unlocked: false, name: 'First Blood', desc: 'Hit your first target' },
+    combo10: { unlocked: false, name: 'Combo Starter', desc: 'Reach 10x combo' },
+    combo25: { unlocked: false, name: 'Combo Master', desc: 'Reach 25x combo' },
+    score10k: { unlocked: false, name: '10K Club', desc: 'Score 10,000 points' },
+    speedDemon: { unlocked: false, name: 'Speed Demon', desc: 'Reach max speed' },
+    survivor: { unlocked: false, name: 'Survivor', desc: 'Survive 5 minutes' }
+  };
+
+  const leaderboardKey = 'gridRiderTop3';
+  const leaderboard = loadLeaderboard();
+
+  const powerupCatalog = [
+    { id: 'rapidPulse', name: 'Rapid Pulse', icon: '⚡', duration: 10 },
+    { id: 'scoreSurge', name: 'Score Surge', icon: '💎', duration: 12 },
+    { id: 'magnet', name: 'Orb Magnet', icon: '🧲', duration: 12 },
+    { id: 'shieldCore', name: 'Shield Core', icon: '🛡️', duration: 14 },
+    { id: 'timeWarp', name: 'Time Warp', icon: '🌀', duration: 9 },
+    { id: 'overclock', name: 'Overclock', icon: '🚀', duration: 10 },
+    { id: 'beatBloom', name: 'Beat Bloom', icon: '🌊', duration: 10 },
+    { id: 'ghostDrive', name: 'Ghost Drive', icon: '👻', duration: 8 },
+    { id: 'comboForge', name: 'Combo Forge', icon: '🔥', duration: 14 },
+    { id: 'luckySpawn', name: 'Lucky Spawn', icon: '🍀', duration: 12 },
+    { id: 'orbStorm', name: 'Orb Storm', icon: '🌠', duration: 7 },
+    { id: 'bassShield', name: 'Bass Shield', icon: '🔊', duration: 12 },
+    { id: 'hyperVision', name: 'Hyper Vision', icon: '👁️', duration: 10 },
+    { id: 'lifeSpark', name: 'Life Spark', icon: '❤️', duration: 0 },
+    { id: 'neonDrift', name: 'Neon Drift', icon: '🌈', duration: 12 },
+    { id: 'perfectLine', name: 'Perfect Line', icon: '🎯', duration: 9 },
+    { id: 'phaseRing', name: 'Phase Ring', icon: '⭕', duration: 10 },
+    { id: 'scoreRain', name: 'Score Rain', icon: '💰', duration: 8 },
+    { id: 'focusCharge', name: 'Focus Charge', icon: '🔋', duration: 0 },
+    { id: 'overdriveCore', name: 'Overdrive Core', icon: '☀️', duration: 8 }
+  ];
+  const activePowerups = new Map();
+
+  const playerState = {
+    pos: new THREE.Vector3(0, 0, 8),
+    vel: new THREE.Vector3(),
+    targetPos: new THREE.Vector3(0, 0, 8),
+    smoothMouse: new THREE.Vector2(),
+    pulseActiveUntil: 0,
+    baseZ: 8,
+    forwardOffset: 0,
+    forwardTarget: 0,
+    isBoostingForward: false
+  };
+
+  const camState = {
+    pos: new THREE.Vector3(0, 5, 15),
+    lookAt: new THREE.Vector3(0, 0, -20),
+    shake: 0,
+    baseFov: 75
+  };
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.FogExp2(0x030308, 0.02);
+  const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x030308);
+  $('canvas-container')?.appendChild(renderer.domElement);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.35);
+  const sun = new THREE.DirectionalLight(0xf72585, 1.2);
+  sun.position.set(5, 8, 5);
+  const neonPrimary = new THREE.PointLight(0x00f5d4, 1.8, 80);
+  const neonSecondary = new THREE.PointLight(0xf72585, 1.2, 80);
+  const neonAccentA = new THREE.PointLight(0x7b2cff, 1.0, 120);
+  const neonAccentB = new THREE.PointLight(0xffd60a, 0.9, 90);
+  const worldGlow = new THREE.HemisphereLight(0x66ddff, 0x08020f, 0.55);
+  neonPrimary.position.set(0, 4, 2);
+  neonSecondary.position.set(-8, 6, -20);
+  neonAccentA.position.set(12, 10, -60);
+  neonAccentB.position.set(-16, 5, -40);
+  scene.add(ambient, sun, neonPrimary, neonSecondary, neonAccentA, neonAccentB, worldGlow);
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(400, 400),
+    new THREE.MeshPhongMaterial({ color: 0x05050f, emissive: 0x001818, emissiveIntensity: 0.15, shininess: 100 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -2.2;
+  scene.add(floor);
+
+  const gridA = new THREE.GridHelper(220, 50, 0x00f5d4, 0x062626);
+  gridA.position.y = -2;
+  const gridB = new THREE.GridHelper(220, 50, 0xf72585, 0x260616);
+  gridB.position.y = -2.05;
+  scene.add(gridA, gridB);
+
+  const tunnelGroup = new THREE.Group();
+  scene.add(tunnelGroup);
+  for (let i = 0; i < 14; i++) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(12, 0.08, 8, 64),
+      new THREE.MeshBasicMaterial({ color: 0x00f5d4, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending })
+    );
+    ring.position.z = -i * 16;
+    ring.userData.baseColor = i % 3 === 0 ? 0x00f5d4 : i % 3 === 1 ? 0xf72585 : 0x7b2cff;
+    ring.material.color.setHex(ring.userData.baseColor);
+    tunnelGroup.add(ring);
+  }
+
+  const skylineGroup = new THREE.Group();
+  scene.add(skylineGroup);
+  for (let i = 0; i < 36; i++) {
+    const tower = new THREE.Mesh(
+      new THREE.BoxGeometry(3 + Math.random() * 6, 10 + Math.random() * 50, 3 + Math.random() * 6),
+      new THREE.MeshPhongMaterial({
+        color: 0x080812,
+        emissive: i % 2 === 0 ? 0x00f5d4 : 0x7b2cff,
+        emissiveIntensity: 0.08,
+        transparent: true,
+        opacity: 0.95
+      })
+    );
+    const side = Math.random() > 0.5 ? 1 : -1;
+    tower.position.set(side * (28 + Math.random() * 50), -2, -20 - i * 18);
+    tower.userData.phase = Math.random() * Math.PI * 2;
+    skylineGroup.add(tower);
+  }
+
+  const auroraGroup = new THREE.Group();
+  scene.add(auroraGroup);
+  for (let i = 0; i < 6; i++) {
+    const aurora = new THREE.Mesh(
+      new THREE.PlaneGeometry(90, 28),
+      new THREE.MeshBasicMaterial({
+        color: i % 2 === 0 ? 0x00f5d4 : 0x7b2cff,
+        transparent: true,
+        opacity: 0.05,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      })
+    );
+    aurora.position.set((Math.random() - 0.5) * 50, 16 + Math.random() * 10, -80 - i * 40);
+    aurora.rotation.x = -0.2 - Math.random() * 0.15;
+    aurora.rotation.z = (Math.random() - 0.5) * 0.5;
+    aurora.userData.phase = Math.random() * Math.PI * 2;
+    auroraGroup.add(aurora);
+  }
+
+  const monolithGroup = new THREE.Group();
+  scene.add(monolithGroup);
+  for (let i = 0; i < 26; i++) {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 40 + Math.random() * 30, 4),
+      new THREE.MeshPhongMaterial({ color: 0x080812, emissive: 0x00f5d4, emissiveIntensity: 0.08, transparent: true, opacity: 0.95 })
+    );
+    const side = Math.random() > 0.5 ? 1 : -1;
+    mesh.position.set(side * (15 + Math.random() * 18), -2 + Math.random() * 12, -i * 18 - 10);
+    mesh.userData.baseY = mesh.position.y;
+    mesh.userData.phase = Math.random() * Math.PI * 2;
+    monolithGroup.add(mesh);
+  }
+
+  const dustGeo = new THREE.BufferGeometry();
+  const dustCount = 1200;
+  const dustPos = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    dustPos[i * 3] = (Math.random() - 0.5) * 260;
+    dustPos[i * 3 + 1] = (Math.random() - 0.5) * 140;
+    dustPos[i * 3 + 2] = -Math.random() * 260;
+  }
+  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  const dust = new THREE.Points(
+    dustGeo,
+    new THREE.PointsMaterial({ size: 0.35, color: 0x88ffee, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending })
+  );
+  scene.add(dust);
+
+  const playerGroup = new THREE.Group();
+  const cockpit = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.85, 1),
+    new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x00f5d4, emissiveIntensity: 1.1, shininess: 100 })
+  );
+  const leftWing = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5, 0.1, 1.1),
+    new THREE.MeshPhongMaterial({ color: 0x00f5d4, emissive: 0x00f5d4, emissiveIntensity: 0.5, transparent: true, opacity: 0.9 })
+  );
+  leftWing.position.set(-1.45, 0, 0);
+  leftWing.rotation.z = 0.14;
+  const rightWing = leftWing.clone();
+  rightWing.position.x = 1.45;
+  rightWing.rotation.z = -0.14;
+  const thruster = new THREE.Mesh(
+    new THREE.ConeGeometry(0.36, 3, 8),
+    new THREE.MeshBasicMaterial({ color: 0x00f5d4, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending })
+  );
+  thruster.rotation.x = -Math.PI / 2;
+  thruster.position.z = 1.25;
+  const shield = new THREE.Mesh(
+    new THREE.SphereGeometry(1.55, 18, 18),
+    new THREE.MeshBasicMaterial({ color: 0x00f5d4, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
+  );
+  const overdriveShield = new THREE.Mesh(
+    new THREE.SphereGeometry(2.15, 18, 18),
+    new THREE.MeshBasicMaterial({ color: 0xffd60a, transparent: true, opacity: 0, wireframe: true, blending: THREE.AdditiveBlending })
+  );
+  playerGroup.add(cockpit, leftWing, rightWing, thruster, shield, overdriveShield);
+  playerGroup.position.copy(playerState.pos);
+  scene.add(playerGroup);
+
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -8);
+
+  const entities = [];
+  const powerupEntities = [];
+  const trails = [];
+  const explosions = [];
+  const energyRings = [];
+
+  class SimpleAudio {
+    constructor() {
+      this.ctx = null;
+      this.master = null;
+      this.musicBus = null;
+      this.drumBus = null;
+      this.bassBus = null;
+      this.fxBus = null;
+      this.timer = null;
+      this.isRunning = false;
+      this.bpm = 140;
+      this.step = 0;
+      this.customEl = null;
+      this.genre = 'techno';
+      this.reverb = null;
+      this.delay = null;
+      this.delayFeedback = null;
+      this.variation = 0;
+    }
+    ensure() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AC();
+        this.master = this.ctx.createGain();
+        this.musicBus = this.ctx.createGain();
+        this.drumBus = this.ctx.createGain();
+        this.bassBus = this.ctx.createGain();
+        this.fxBus = this.ctx.createGain();
+        this.reverb = this.ctx.createConvolver();
+        this.reverb.buffer = this.createImpulse(2.4, 2.2);
+        this.delay = this.ctx.createDelay(1.2);
+        this.delay.delayTime.value = 0.22;
+        this.delayFeedback = this.ctx.createGain();
+        this.delayFeedback.gain.value = 0.22;
+        this.delay.connect(this.delayFeedback);
+        this.delayFeedback.connect(this.delay);
+        this.musicBus.connect(this.master);
+        this.drumBus.connect(this.master);
+        this.bassBus.connect(this.master);
+        this.fxBus.connect(this.reverb);
+        this.fxBus.connect(this.delay);
+        this.reverb.connect(this.master);
+        this.delay.connect(this.master);
+        this.master.gain.value = volumeSettings.master / 100;
+        this.master.connect(this.ctx.destination);
+      }
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+    }
+    createImpulse(duration, decay) {
+      const length = this.ctx.sampleRate * duration;
+      const buffer = this.ctx.createBuffer(2, length, this.ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const data = buffer.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+        }
+      }
+      return buffer;
+    }
+    createNoiseBuffer(duration = 0.12) {
+      const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * duration, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      return buffer;
+    }
+    setMasterVolume() {
+      if (this.master) this.master.gain.value = volumeSettings.master / 100;
+      if (this.customEl) this.customEl.volume = Math.max(0, Math.min(1, volumeSettings.master / 100));
+    }
+    setGenre(genre) {
+      this.genre = genre;
+      const bpmMap = {
+        techno: 145,
+        ambient: 95,
+        spatial: 112,
+        epic: 132,
+        adventure: 126,
+        synthwave: 118,
+        industrial: 138,
+        trance: 136,
+        drumstep: 174,
+        custom: 120
+      };
+      this.bpm = bpmMap[genre] || 140;
+    }
+    setVariation(index) {
+      this.variation = ((index % 3) + 3) % 3;
+    }
+    getVariationName() {
+      return (genreVariations[this.genre] || ['VAR-1', 'VAR-2', 'VAR-3'])[this.variation] || 'VAR-1';
+    }
+    kick(time, force = 1) {
+      const variationForce = this.variation === 1 ? 1.08 : this.variation === 2 ? 0.92 : 1;
+      force *= variationForce;
+      const osc = this.ctx.createOscillator();
+      const click = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      click.type = 'triangle';
+      osc.frequency.setValueAtTime(145, time);
+      osc.frequency.exponentialRampToValueAtTime(42, time + 0.14);
+      click.frequency.setValueAtTime(900, time);
+      click.frequency.exponentialRampToValueAtTime(120, time + 0.03);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.95 * force * (volumeSettings.drums / 100), time + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.34);
+      osc.connect(gain).connect(this.drumBus);
+      click.connect(gain);
+      osc.start(time); click.start(time);
+      osc.stop(time + 0.35); click.stop(time + 0.05);
+    }
+    clap(time) {
+      const clapGainScale = this.variation === 2 ? 0.8 : 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.createNoiseBuffer(0.16);
+      const band = this.ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = 1800;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.24 * clapGainScale * (volumeSettings.drums / 100), time + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.14);
+      src.connect(band).connect(gain).connect(this.drumBus);
+      src.start(time);
+    }
+    hat(time, open = false) {
+      if (this.variation === 2 && !open) open = true;
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.createNoiseBuffer(open ? 0.18 : 0.06);
+      const hp = this.ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 7000;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime((open ? 0.09 : 0.06) * (volumeSettings.drums / 100), time + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + (open ? 0.16 : 0.05));
+      src.connect(hp).connect(gain).connect(this.drumBus);
+      src.start(time);
+    }
+    bass(time, accent = false) {
+      if (this.variation === 1) accent = true;
+      const osc = this.ctx.createOscillator();
+      const sub = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+      const noteMap = {
+        techno: 55,
+        ambient: 43,
+        spatial: 49,
+        epic: 65,
+        adventure: 73,
+        synthwave: 61,
+        industrial: 45,
+        trance: 57,
+        drumstep: 50
+      };
+      const root = (noteMap[this.genre] || 55) + (this.variation === 2 ? 7 : this.variation === 1 ? 2 : 0);
+      osc.type = 'sawtooth';
+      sub.type = 'sine';
+      osc.frequency.value = root;
+      sub.frequency.value = root / 2;
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(accent ? 1200 : 700, time);
+      filter.frequency.exponentialRampToValueAtTime(220, time + 0.25);
+      filter.Q.value = accent ? 12 : 8;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime((accent ? 0.22 : 0.15) * (volumeSettings.bass / 100), time + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.3);
+      osc.connect(filter); sub.connect(filter);
+      filter.connect(gain).connect(this.bassBus);
+      osc.start(time); sub.start(time);
+      osc.stop(time + 0.31); sub.stop(time + 0.31);
+    }
+    pad(time) {
+      const padScale = this.variation === 1 ? 1.18 : this.variation === 2 ? 0.82 : 1;
+      const freqs = this.genre === 'ambient'
+        ? [220, 261.63, 329.63]
+        : this.genre === 'trance'
+        ? [261.63, 329.63, 392.0]
+        : this.genre === 'synthwave'
+        ? [196.0, 246.94, 293.66]
+        : [174.61, 220, 261.63];
+      freqs.forEach(f => {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = f;
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.linearRampToValueAtTime(0.035 * padScale * (volumeSettings.ambient / 100), time + 0.35);
+        gain.gain.setValueAtTime(0.035 * padScale * (volumeSettings.ambient / 100), time + 1.7);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + 2.5);
+        osc.connect(gain).connect(this.musicBus);
+        gain.connect(this.fxBus);
+        osc.start(time); osc.stop(time + 2.6);
+      });
+    }
+    lead(time, bright = false) {
+      if (this.variation === 1) bright = true;
+      const oscA = this.ctx.createOscillator();
+      const oscB = this.ctx.createOscillator();
+      const filter = this.ctx.createBiquadFilter();
+      const gain = this.ctx.createGain();
+      const melody = this.genre === 'trance'
+        ? [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25]
+        : this.genre === 'synthwave'
+        ? [392.0, 493.88, 587.33, 493.88, 392.0, 329.63]
+        : this.genre === 'industrial'
+        ? [329.63, 311.13, 293.66, 246.94, 220.0, 246.94]
+        : this.genre === 'drumstep'
+        ? [659.25, 783.99, 987.77, 783.99, 659.25, 523.25]
+        : [440, 523.25, 659.25, 783.99, 880, 659.25];
+      const note = melody[(this.step + this.variation) % melody.length] * (this.variation === 2 ? 0.5 : 1);
+      oscA.type = this.genre === 'techno' ? 'sawtooth' : 'triangle';
+      oscB.type = 'triangle';
+      oscA.frequency.value = note;
+      oscB.frequency.value = note * 1.005;
+      filter.type = 'lowpass';
+      filter.frequency.value = bright ? 4200 : 2800;
+      filter.Q.value = 5;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime((bright ? 0.12 : 0.08) * (volumeSettings.lead / 100), time + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.25);
+      oscA.connect(filter); oscB.connect(filter);
+      filter.connect(gain).connect(this.musicBus);
+      gain.connect(this.fxBus);
+      oscA.start(time); oscB.start(time);
+      oscA.stop(time + 0.28); oscB.stop(time + 0.28);
+    }
+    stab(time) {
+      const stabPitch = this.variation === 2 ? 246.94 : this.variation === 1 ? 392.0 : 329.63;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+      osc.type = 'square';
+      osc.frequency.value = stabPitch;
+      filter.type = 'bandpass';
+      filter.frequency.value = 1200;
+      filter.Q.value = 4;
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(0.07 * (volumeSettings.lead / 100), time + 0.005);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
+      osc.connect(filter).connect(gain).connect(this.musicBus);
+      gain.connect(this.fxBus);
+      osc.start(time); osc.stop(time + 0.13);
+    }
+    tick() {
+      if (!this.ctx || !this.isRunning) return;
+      const time = this.ctx.currentTime + 0.03;
+      const step = this.step;
+      const genre = this.genre;
+      const v = this.variation;
+      if (step % 4 === 0) {
+        this.kick(time, genre === 'techno' || genre === 'industrial' ? 1 : 0.9);
+        if (v === 2 && (genre === 'techno' || genre === 'drumstep')) this.kick(time + 0.06, 0.55);
+        triggerBeatEffects();
+      }
+      if (genre === 'techno' || genre === 'epic' || genre === 'adventure' || genre === 'industrial') {
+        if (step % 4 === 2) this.clap(time);
+        if (step % 2 === 0 || v === 1) this.hat(time, false);
+        if (step % 8 === 7 || (v === 2 && step % 8 === 5)) this.hat(time, true);
+      }
+      if (genre === 'spatial' && (step % 4 === 2 || (v === 1 && step % 8 === 6))) this.hat(time, true);
+      if (genre === 'drumstep') {
+        if (step % 2 === 0) this.hat(time, false);
+        if (step % 4 === 1 || step % 4 === 3 || (v === 1 && step % 8 === 6)) this.clap(time + 0.01);
+        if (step % 8 === 6 || (v === 2 && step % 8 === 4)) this.hat(time, true);
+      }
+      if (genre === 'trance') {
+        if (step % 2 === 0 || v === 1) this.hat(time, false);
+        if (step % 4 === 2) this.clap(time);
+      }
+      if (genre !== 'ambient') {
+        this.bass(time, step % 4 === 0 || genre === 'industrial' || v === 1);
+        if (v === 2 && (genre === 'techno' || genre === 'industrial')) this.bass(time + 0.08, true);
+      }
+      if ((genre === 'ambient' || genre === 'spatial' || genre === 'trance' || genre === 'synthwave') && (step % 8 === 0 || (v === 1 && step % 8 === 4))) this.pad(time);
+      if ((genre === 'spatial' || genre === 'epic' || genre === 'adventure' || genre === 'trance' || genre === 'synthwave') && (step % 4 === 2 || (v === 2 && step % 8 === 1))) this.lead(time, true);
+      if (genre === 'techno' && (step === 3 || step === 11 || (v === 2 && step === 7))) this.stab(time);
+      if (genre === 'industrial' && (step === 1 || step === 9 || step === 13 || (v === 2 && step === 5))) this.stab(time + 0.01);
+      if (genre === 'synthwave' && (step % 8 === 4 || (v === 1 && step % 8 === 2))) this.lead(time, false);
+      if (genre === 'epic' && (step % 8 === 4 || (v === 2 && step % 8 === 0))) this.pad(time);
+      if (genre === 'ambient' && v === 2 && step % 8 === 2) this.lead(time, false);
+      if (genre === 'trance' && v === 2 && step % 8 === 7) this.lead(time + 0.03, true);
+      if (beatBurstChance > 0 && Math.random() < beatBurstChance) this.kick(time + 0.04, 0.6);
+      this.step = (this.step + 1) % 16;
+    }
+    start() {
+      this.ensure();
+      this.stop();
+      this.isRunning = true;
+      if (currentGenre === 'custom' && this.customEl) {
+        this.customEl.currentTime = 0;
+        this.customEl.loop = true;
+        this.customEl.play().catch(() => {});
+      } else {
+        const interval = (60 / (this.bpm * timeWarpFactor) / 4) * 1000;
+        this.timer = setInterval(() => this.tick(), interval);
+        this.tick();
+      }
+    }
+    stop() {
+      this.isRunning = false;
+      if (this.timer) clearInterval(this.timer);
+      this.timer = null;
+      if (this.customEl) {
+        this.customEl.pause();
+        this.customEl.currentTime = 0;
+      }
+    }
+    restartIfRunning() {
+      if (this.isRunning) this.start();
+    }
+    setCustomFile(file) {
+      if (this.customEl) {
+        this.customEl.pause();
+        URL.revokeObjectURL(this.customEl.src);
+      }
+      this.customEl = new Audio(URL.createObjectURL(file));
+      this.customEl.loop = true;
+      this.customEl.volume = volumeSettings.master / 100;
+    }
+  }
+
+  const audioEngine = new SimpleAudio();
+
+  function loadLeaderboard() {
+    try {
+      const data = JSON.parse(localStorage.getItem(leaderboardKey) || '[]');
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveLeaderboard() {
+    localStorage.setItem(leaderboardKey, JSON.stringify(leaderboard.slice(0, 3)));
+  }
+
+  function renderLeaderboard() {
+    const list = $('leaderboard-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const rows = leaderboard.length ? leaderboard : [
+      { name: 'VOID', score: 0, genre: '---' },
+      { name: 'VOID', score: 0, genre: '---' },
+      { name: 'VOID', score: 0, genre: '---' }
+    ];
+    rows.slice(0, 3).forEach((entry, i) => {
+      const row = document.createElement('div');
+      row.className = 'score-row';
+      row.innerHTML = '<div class="score-rank">' + (i + 1) + '</div><div>' + entry.name + '<br><span style="opacity:.6;font-size:10px">' + entry.genre + '</span></div><div style="font-family:Bebas Neue,sans-serif;font-size:22px;color:var(--cyan)">' + Number(entry.score).toLocaleString() + '</div>';
+      list.appendChild(row);
+    });
+  }
+
+  function updateLeaderboard(finalScore) {
+    const entry = { name: 'RIDER', score: finalScore, genre: currentGenre.toUpperCase() };
+    leaderboard.push(entry);
+    leaderboard.sort((a, b) => b.score - a.score);
+    leaderboard.splice(3);
+    saveLeaderboard();
+    renderLeaderboard();
+  }
+
+  function activatePowerup(def) {
+    if (!def) return;
+    if (def.id === 'lifeSpark') {
+      if (!bonusLifeLock) lives = Math.min(3, lives + 1);
+      bonusLifeLock = true;
+      setTimeout(() => { bonusLifeLock = false; }, 4000);
+      createHitUI('LIFE +1', '#ffd60a', playerGroup.position);
+      updateHUD();
+      return;
+    }
+    if (def.id === 'focusCharge') {
+      focus = 100;
+      createHitUI('FOCUS MAX', '#00f5d4', playerGroup.position);
+      updateHUD();
+      return;
+    }
+    activePowerups.set(def.id, { ...def, endsAt: performance.now() + def.duration * 1000 });
+    applyPowerupEffects();
+    createHitUI(def.name.toUpperCase(), '#ffd60a', playerGroup.position);
+    updatePowerupHUD();
+  }
+
+  function applyPowerupEffects() {
+    currentSpawnRateMultiplier = activePowerups.has('luckySpawn') ? 0.75 : 1;
+    currentScoreMultiplier = activePowerups.has('scoreSurge') ? 2 : activePowerups.has('scoreRain') ? 1.5 : 1;
+    magnetRadius = activePowerups.has('magnet') ? 8 : 0;
+    shieldCharges = activePowerups.has('shieldCore') || activePowerups.has('bassShield') ? 2 : 0;
+    timeWarpFactor = activePowerups.has('timeWarp') ? 0.82 : activePowerups.has('overclock') ? 1.22 : 1;
+    orbScaleBoost = activePowerups.has('hyperVision') ? 1.18 : 1;
+    beatBurstChance = activePowerups.has('beatBloom') ? 0.3 : 0;
+    autoPulseEnabled = activePowerups.has('phaseRing');
+    hyperGlow = activePowerups.has('neonDrift') ? 1 : 0;
+    ghostMode = activePowerups.has('ghostDrive');
+    comboDecaySafe = activePowerups.has('comboForge') || activePowerups.has('perfectLine');
+    if (activePowerups.has('overdriveCore')) overdriveTime = Math.max(overdriveTime, 8);
+    if (activePowerups.has('orbStorm')) {
+      for (let i = 0; i < 3; i++) spawn();
+    }
+    audioEngine.restartIfRunning();
+  }
+
+  function updatePowerupHUD() {
+    const stack = $('powerup-stack');
+    if (!stack) return;
+    stack.innerHTML = '';
+    const items = Array.from(activePowerups.values()).sort((a, b) => a.endsAt - b.endsAt);
+    items.forEach(p => {
+      const left = Math.max(0, (p.endsAt - performance.now()) / 1000);
+      const chip = document.createElement('div');
+      chip.className = 'powerup-chip';
+      chip.innerHTML = '<div class="powerup-icon">' + p.icon + '</div><div class="powerup-name">' + p.name + '</div><div class="powerup-time">' + left.toFixed(1) + 's</div>';
+      stack.appendChild(chip);
+    });
+  }
+
+  function expirePowerups() {
+    const now = performance.now();
+    let changed = false;
+    activePowerups.forEach((value, key) => {
+      if (value.endsAt <= now) {
+        activePowerups.delete(key);
+        changed = true;
+      }
+    });
+    if (changed) {
+      applyPowerupEffects();
+      updatePowerupHUD();
+    }
+  }
+
+  function flash(color) {
+    setStyle('hit-flash', 'background', color);
+    setStyle('hit-flash', 'opacity', '1');
+    setTimeout(() => setStyle('hit-flash', 'opacity', '0'), 120);
+  }
+
+  function triggerBeatEffects() {
+    lastBeatVisual = performance.now();
+    setStyle('beat-flash', 'opacity', '0.35');
+    setTimeout(() => setStyle('beat-flash', 'opacity', '0'), 100);
+    $('beat-indicator')?.classList.add('beat');
+    $('beat-meter')?.classList.add('active');
+    $('perfect-ring')?.classList.add('beat-sync');
+    $('score-panel')?.classList.add('beat-pulse');
+    setTimeout(() => {
+      $('beat-indicator')?.classList.remove('beat');
+      $('beat-meter')?.classList.remove('active');
+      $('perfect-ring')?.classList.remove('beat-sync');
+      $('score-panel')?.classList.remove('beat-pulse');
+    }, 180);
+    neonPrimary.intensity = 2.8;
+    neonSecondary.intensity = 1.8;
+    camState.shake = 0.13;
+    createEnergyRing();
+  }
+
+  function createEnergyRing() {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.2, 0.45, 32),
+      new THREE.MeshBasicMaterial({ color: 0x00f5d4, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
+    );
+    ring.position.copy(playerGroup.position);
+    ring.lookAt(camera.position);
+    ring.userData.life = 1;
+    ring.userData.grow = 7;
+    scene.add(ring);
+    energyRings.push(ring);
+  }
+
+  function spawn() {
+    const powerupChance = 0.12;
+    if (Math.random() < powerupChance) {
+      const def = powerupCatalog[Math.floor(Math.random() * powerupCatalog.length)];
+      const mesh = new THREE.Mesh(
+        new THREE.TorusKnotGeometry(0.7, 0.22, 80, 12),
+        new THREE.MeshPhongMaterial({ color: 0xffd60a, emissive: 0xffd60a, emissiveIntensity: 1.0, shininess: 140, transparent: true, opacity: 0.95 })
+      );
+      mesh.position.set((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 9, -120);
+      mesh.userData.type = 'p';
+      mesh.userData.rot = 0.04;
+      mesh.userData.baseY = mesh.position.y;
+      mesh.userData.pulsePhase = Math.random() * Math.PI * 2;
+      mesh.userData.powerup = def;
+      mesh.userData.scaleBase = 1.15;
+      const aura = new THREE.Mesh(
+        new THREE.SphereGeometry(1.7, 16, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffd60a, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending })
+      );
+      mesh.add(aura);
+      scene.add(mesh);
+      entities.push(mesh);
+      return;
+    }
+
+    const hazardChance = 0.18 + (speed - 1) * 0.08;
+    const isHazard = Math.random() < hazardChance;
+
+    const orbPalettes = [
+      { core: 0x00f5d4, glow: 0x7df9ff, aura: 0x00f5d4 },
+      { core: 0xf72585, glow: 0xff7ab6, aura: 0xf72585 },
+      { core: 0xffd60a, glow: 0xfff08a, aura: 0xffd60a },
+      { core: 0x7b2cff, glow: 0xb38cff, aura: 0x7b2cff },
+      { core: 0x3a86ff, glow: 0x8db8ff, aura: 0x3a86ff }
+    ];
+
+    const hazardPalette = { core: 0xff2e63, glow: 0xff8fab, aura: 0xff2e63 };
+    const palette = isHazard ? hazardPalette : orbPalettes[Math.floor(Math.random() * orbPalettes.length)];
+
+    const geo = isHazard ? new THREE.OctahedronGeometry(1.15, 0) : new THREE.SphereGeometry(1.15, 20, 20);
+    const mat = new THREE.MeshPhongMaterial({
+      color: palette.core,
+      emissive: palette.glow,
+      emissiveIntensity: isHazard ? 0.95 : 0.85,
+      transparent: true,
+      opacity: 0.96,
+      shininess: 120
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 9, -120);
+    mesh.userData.type = isHazard ? 'h' : 'n';
+    mesh.userData.rot = (Math.random() - 0.5) * 0.06;
+    mesh.userData.baseY = mesh.position.y;
+    mesh.userData.pulsePhase = Math.random() * Math.PI * 2;
+    mesh.userData.palette = palette;
+    mesh.userData.scaleBase = isHazard ? 1.7 * 1.7 : 1.0 * 1.7;
+
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(isHazard ? 1.7 : 1.75, 16, 16),
+      new THREE.MeshBasicMaterial({ color: palette.glow, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending })
+    );
+    const aura = new THREE.Mesh(
+      new THREE.SphereGeometry(isHazard ? 2.2 : 2.35, 16, 16),
+      new THREE.MeshBasicMaterial({ color: palette.aura, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
+    );
+    mesh.add(glow);
+    mesh.add(aura);
+
+    if (!isHazard) {
+      const innerCore = new THREE.Mesh(
+        new THREE.SphereGeometry(0.45, 12, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending })
+      );
+      mesh.add(innerCore);
+    }
+
+    scene.add(mesh);
+    entities.push(mesh);
+  }
+
+  function createExplosion(pos, golden = false) {
+    const color = golden ? 0xffd60a : 0xffffff;
+    for (let i = 0; i < 14; i++) {
+      const frag = new THREE.Mesh(
+        new THREE.TetrahedronGeometry(0.15 + Math.random() * 0.35),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, wireframe: Math.random() > 0.5 })
+      );
+      frag.position.copy(pos);
+      frag.userData.vel = new THREE.Vector3((Math.random() - 0.5) * 1.8, (Math.random() - 0.5) * 1.8, (Math.random() - 0.5) * 1.8);
+      frag.userData.life = 1;
+      frag.userData.rot = (Math.random() - 0.5) * 0.25;
+      scene.add(frag);
+      explosions.push(frag);
+    }
+  }
+
+  function createHitUI(text, color, pos) {
+    const p = pos.clone().project(camera);
+    const x = (p.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (p.y * -0.5 + 0.5) * window.innerHeight;
+    const el = document.createElement('div');
+    el.className = 'hit-text';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.color = color;
+    el.textContent = text;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+  }
+
+  function checkAchievement(key) {
+    if (!achievements[key] || achievements[key].unlocked) return;
+    achievements[key].unlocked = true;
+    populateAchievements();
+    const notif = document.createElement('div');
+    notif.style.cssText = 'position:fixed;top:90px;right:20px;padding:14px 18px;background:linear-gradient(135deg, rgba(0,245,212,.94), rgba(114,9,183,.94));border:2px solid #00f5d4;border-radius:8px;z-index:100;font-family:Bebas Neue,sans-serif;font-size:18px;box-shadow:0 0 30px rgba(0,245,212,.45);animation:slideInRight .4s ease-out;';
+    notif.innerHTML = '🏆 Achievement Unlocked!<br><span style="font-size:14px;opacity:.8">' + achievements[key].name + '</span>';
+    document.body.appendChild(notif);
+    setTimeout(() => {
+      notif.style.animation = 'slideOutRight .4s ease-in';
+      setTimeout(() => notif.remove(), 400);
+    }, 2400);
+  }
+
+  function populateAchievements() {
+    const list = $('achievements-list');
+    if (!list) return;
+    list.innerHTML = '';
+    Object.values(achievements).forEach(ach => {
+      const card = document.createElement('div');
+      card.className = 'achievement-card' + (ach.unlocked ? ' unlocked' : '');
+      card.innerHTML = '<div class="achievement-icon">' + (ach.unlocked ? '🏆' : '🔒') + '</div><div class="achievement-info"><div class="achievement-name">' + ach.name + '</div><div class="achievement-desc">' + ach.desc + '</div></div>';
+      list.appendChild(card);
+    });
+  }
+
+  function updateHUD() {
+    setText('score-val', score.toLocaleString());
+    setText('combo-number', combo);
+    setText('speed-val', speed.toFixed(1) + 'x');
+    setStyle('speed-bar', 'width', Math.min(100, (speed / BALANCE.maxSpeed) * 100) + '%');
+    setStyle('pulse-bar', 'width', Math.max(0, Math.min(100, focus)) + '%');
+    setStyle('combo-ring-fill', 'strokeDashoffset', String(302 - (Math.min(combo, 50) / 50) * 302));
+    for (let i = 1; i <= 3; i++) toggleClass('p-' + i, 'empty', i > lives);
+    setStyle('speed-lines', 'opacity', Math.max(0, Math.min(1, (speed - 1) / 1.2)).toFixed(2));
+    const tier = combo >= 25 ? 'OVERDRIVE' : combo >= 15 ? 'HYPER' : combo >= 8 ? 'FLOW' : 'BASE';
+    const variationLabel = (genreVariations[currentGenre] || ['VAR-1', 'VAR-2', 'VAR-3'])[currentVariation] || 'VAR-1';
+    setText('sync-tier', 'SYNC: ' + tier + ' • ' + variationLabel + (currentScoreMultiplier > 1 ? ' • x' + currentScoreMultiplier : ''));
+  }
+
+  function resetRunState() {
+    score = 0;
+    combo = 0;
+    speed = 1.0 * gameSettings.speedMultiplier;
+    focus = 0;
+    overdriveTime = 0;
+    activePowerups.clear();
+    currentSpawnRateMultiplier = 1;
+    currentScoreMultiplier = 1;
+    shieldCharges = 0;
+    magnetRadius = 0;
+    orbScaleBoost = 1;
+    beatBurstChance = 0;
+    autoPulseEnabled = false;
+    hyperGlow = 0;
+    ghostMode = false;
+    comboDecaySafe = false;
+    timeWarpFactor = 1;
+    bonusLifeLock = false;
+    lives = gameSettings.difficulty === 'easy' ? 3 : gameSettings.difficulty === 'hard' ? 2 : 3;
+    playerState.pos.set(0, 0, 8);
+    playerState.vel.set(0, 0, 0);
+    playerState.targetPos.set(0, 0, 8);
+    playerState.smoothMouse.set(0, 0);
+    playerState.pulseActiveUntil = 0;
+    playerState.forwardOffset = 0;
+    playerState.forwardTarget = 0;
+    playerState.isBoostingForward = false;
+    playerGroup.position.copy(playerState.pos);
+    playerGroup.rotation.set(0, 0, 0);
+    camState.pos.set(0, 5, 15);
+    camState.baseFov = 75;
+    entities.forEach(e => scene.remove(e));
+    trails.forEach(t => scene.remove(t));
+    explosions.forEach(e => scene.remove(e));
+    energyRings.forEach(r => scene.remove(r));
+    entities.length = 0;
+    trails.length = 0;
+    explosions.length = 0;
+    energyRings.length = 0;
+    gameStartTime = performance.now();
+    startSlowUntil = gameStartTime + 8000;
+    updatePowerupHUD();
+    updateHUD();
+  }
+
+  function startRun() {
+    resetRunState();
+    gameActive = true;
+    isPaused = false;
+    setDisplay('start-screen', 'none');
+    setDisplay('mission-report', 'none');
+    setDisplay('pause-menu', 'none');
+    setDisplay('genre-menu', 'none');
+    setDisplay('audio-menu', 'none');
+    setDisplay('custom-menu', 'none');
+    setDisplay('achievements-menu', 'none');
+    audioEngine.setGenre(currentGenre);
+    audioEngine.setVariation(currentVariation);
+    audioEngine.start();
+    setText('genre-display', 'GENRE: ' + currentGenre.toUpperCase());
+    setStyle('genre-display', 'opacity', '1');
+    setTimeout(() => setStyle('genre-display', 'opacity', '0'), 2400);
+  }
+
+  function gameOver() {
+    gameActive = false;
+    isPaused = false;
+    audioEngine.stop();
+    updateLeaderboard(score);
+    setDisplay('mission-report', 'flex');
+    setHTML('final-stats', 'Score: ' + score.toLocaleString() + '<br>Combo: ' + combo + '<br>Speed: ' + speed.toFixed(1) + 'x<br>Genre: ' + currentGenre.toUpperCase() + '<br><br><span style="color:var(--yellow)">TOP 3 SAVED</span>');
+  }
+
+  function triggerPulse() {
+    if (!gameActive || isPaused || focus < 100) return;
+    focus = 0;
+    playerState.pulseActiveUntil = performance.now() + (activePowerups.has('rapidPulse') ? 4200 : 2500);
+    flash('rgba(255,214,10,0.35)');
+    setStyle('combo-glow', 'opacity', '0.9');
+    setTimeout(() => setStyle('combo-glow', 'opacity', '0'), 420);
+    for (let i = 0; i < 3; i++) setTimeout(createEnergyRing, i * 100);
+    updateHUD();
+  }
+
+  function cycleGenre() {
+    const genres = ['techno', 'ambient', 'spatial', 'epic', 'adventure', 'synthwave', 'industrial', 'trance', 'drumstep', 'custom'];
+    const nextIndex = (genres.indexOf(currentGenre) + 1) % genres.length;
+    currentGenre = genres[nextIndex];
+    currentVariation = 0;
+    const label = (genreVariations[currentGenre] || ['VAR-1'])[0];
+    setText('genre-display', '♫ GENRE: ' + currentGenre.toUpperCase() + ' • ' + label + ' ♫');
+    setStyle('genre-display', 'opacity', '1');
+    setTimeout(() => setStyle('genre-display', 'opacity', '0'), 3000);
+    if (gameActive && !isPaused) {
+      audioEngine.setGenre(currentGenre);
+      audioEngine.setVariation(currentVariation);
+      audioEngine.start();
+    }
+    updateHUD();
+  }
+
+  function toggleVariation() {
+    if (currentGenre === 'custom') return;
+    currentVariation = (currentVariation + 1) % 3;
+    audioEngine.setVariation(currentVariation);
+    if (gameActive && !isPaused) audioEngine.start();
+    const label = (genreVariations[currentGenre] || ['VAR-1', 'VAR-2', 'VAR-3'])[currentVariation] || 'VAR-1';
+    setText('genre-display', '♫ ' + currentGenre.toUpperCase() + ' • ' + label + ' ♫');
+    setStyle('genre-display', 'opacity', '1');
+    setTimeout(() => setStyle('genre-display', 'opacity', '0'), 2200);
+    updateHUD();
+  }
+
+  function togglePause() {
+    if (!gameActive) return;
+    isPaused = !isPaused;
+    setDisplay('pause-menu', isPaused ? 'flex' : 'none');
+    if (isPaused) audioEngine.stop(); else audioEngine.start();
+  }
+
+  function showAudioMenu() {
+    setDisplay('audio-menu', 'flex');
+    if (gameActive) {
+      isPaused = true;
+      setDisplay('pause-menu', 'none');
+      audioEngine.stop();
+    }
+  }
+
+  function showCustomMenu() {
+    setDisplay('custom-menu', 'flex');
+    if (gameActive) {
+      isPaused = true;
+      setDisplay('pause-menu', 'none');
+      audioEngine.stop();
+    }
+  }
+
+  function showAchievementsMenu() {
+    populateAchievements();
+    setDisplay('achievements-menu', 'flex');
+    if (gameActive) {
+      isPaused = true;
+      setDisplay('pause-menu', 'none');
+      audioEngine.stop();
+    }
+  }
+
+  function applyTheme(theme) {
+    const presets = {
+      neon: { fog: 0x030308, primary: 0x00f5d4, secondary: 0xf72585, accent: 0x7b2cff, glow: 0x66ddff },
+      space: { fog: 0x020311, primary: 0x7df9ff, secondary: 0x7b2cff, accent: 0xffd60a, glow: 0x99bbff },
+      acid: { fog: 0x061004, primary: 0xb8ff00, secondary: 0xff006e, accent: 0x00f5d4, glow: 0xe2ff7a },
+      fire: { fog: 0x120504, primary: 0xff9e00, secondary: 0xff2e63, accent: 0xffd60a, glow: 0xffc56b },
+      ocean: { fog: 0x03111a, primary: 0x00d4ff, secondary: 0x0066ff, accent: 0x7b2cff, glow: 0x79f0ff }
+    };
+    const key = /space|cosmic|galaxy|deep/i.test(theme)
+      ? 'space'
+      : /acid|toxic|wasteland/i.test(theme)
+      ? 'acid'
+      : /fire|lava|inferno/i.test(theme)
+      ? 'fire'
+      : /ocean|water|blue|storm/i.test(theme)
+      ? 'ocean'
+      : 'neon';
+    const p = presets[key];
+    scene.fog.color.setHex(p.fog);
+    renderer.setClearColor(p.fog);
+    gridA.material.color.setHex(p.primary);
+    gridB.material.color.setHex(p.secondary);
+    neonPrimary.color.setHex(p.primary);
+    neonSecondary.color.setHex(p.secondary);
+    neonAccentA.color.setHex(p.accent);
+    neonAccentB.color.setHex(p.glow);
+    worldGlow.color.setHex(p.glow);
+    worldGlow.groundColor.setHex(p.fog);
+    cockpit.material.emissive.setHex(p.primary);
+    leftWing.material.color.setHex(p.primary);
+    leftWing.material.emissive.setHex(p.primary);
+    rightWing.material.color.setHex(p.primary);
+    rightWing.material.emissive.setHex(p.primary);
+    thruster.material.color.setHex(p.primary);
+    shield.material.color.setHex(p.primary);
+    overdriveShield.material.color.setHex(0xffd60a);
+    floor.material.emissive.setHex(p.primary);
+    tunnelGroup.children.forEach((r, i) => {
+      const ringColor = i % 3 === 0 ? p.primary : i % 3 === 1 ? p.secondary : p.accent;
+      r.material.color.setHex(ringColor);
+      r.userData.baseColor = ringColor;
+    });
+    monolithGroup.children.forEach((m, i) => {
+      m.material.emissive.setHex(i % 2 === 0 ? p.primary : p.accent);
+    });
+    if (typeof skylineGroup !== 'undefined') {
+      skylineGroup.children.forEach((t, i) => {
+        t.material.emissive.setHex(i % 2 === 0 ? p.primary : p.accent);
+      });
+    }
+    if (typeof auroraGroup !== 'undefined') {
+      auroraGroup.children.forEach((a, i) => {
+        a.material.color.setHex(i % 2 === 0 ? p.primary : p.accent);
+      });
+    }
+  }
+
+  function generateWorld(theme) {
+    setDisplay('loading-msg', 'block');
+    setTimeout(() => {
+      applyTheme(theme || 'neon');
+      setDisplay('loading-msg', 'none');
+      startRun();
+    }, 500);
+  }
+
+  function hit(entity, perfect) {
+    const isHazard = entity.userData.type === 'h';
+
+    if (isHazard && playerState.pulseActiveUntil > performance.now()) {
+      score += 500 * currentScoreMultiplier;
+      createHitUI('PULSE KILL', '#ffd60a', entity.position);
+      createExplosion(entity.position, true);
+      flash('rgba(255,214,10,0.3)');
+      scene.remove(entity);
+      entities.splice(entities.indexOf(entity), 1);
+      updateHUD();
+      return;
+    }
+
+    if (!isHazard) {
+      const onBeat = performance.now() - lastBeatVisual < 180;
+      const base = perfect ? 200 : 100;
+      score += base * Math.max(1, combo + 1) * (onBeat ? 2 : 1) * currentScoreMultiplier;
+      combo += 1;
+      speed = Math.min(BALANCE.maxSpeed * gameSettings.speedMultiplier, speed + 0.03);
+      focus = Math.min(100, focus + (perfect ? 14 : 8));
+      if (combo === 1) checkAchievement('firstHit');
+      if (combo === 10) checkAchievement('combo10');
+      if (combo === 25) {
+        checkAchievement('combo25');
+        overdriveTime = 8;
+        createHitUI('OVERDRIVE!', '#ffd60a', playerGroup.position);
+      }
+      if (score >= 10000) checkAchievement('score10k');
+      if (speed >= BALANCE.maxSpeed * gameSettings.speedMultiplier) checkAchievement('speedDemon');
+      flash(perfect ? 'rgba(255,214,10,0.18)' : 'rgba(0,245,212,0.12)');
+      createHitUI(onBeat ? (perfect ? 'BEAT PERFECT!' : 'BEAT HIT!') : (perfect ? 'PERFECT' : 'GOOD'), perfect ? '#ffd60a' : '#00f5d4', entity.position);
+      createExplosion(entity.position, perfect);
+    } else {
+      if ((shieldCharges > 0 || ghostMode) && !bonusLifeLock) {
+        shieldCharges = Math.max(0, shieldCharges - 1);
+        bonusLifeLock = true;
+        setTimeout(() => { bonusLifeLock = false; }, 800);
+        createHitUI('SHIELD BLOCK', '#7df9ff', entity.position);
+        flash('rgba(125,249,255,0.24)');
+        scene.remove(entity);
+        entities.splice(entities.indexOf(entity), 1);
+        applyPowerupEffects();
+        updatePowerupHUD();
+        updateHUD();
+        return;
+      }
+      lives -= 1;
+      combo = 0;
+      speed = Math.max(1, speed - 0.22);
+      focus = Math.max(0, focus - 18);
+      flash('rgba(247,37,133,0.35)');
+      createHitUI('SHATTER', '#f72585', entity.position);
+      createExplosion(entity.position, false);
+      setStyle('chromatic-aberration', 'opacity', '0.7');
+      setTimeout(() => setStyle('chromatic-aberration', 'opacity', '0'), 250);
+      if (lives <= 0) {
+        scene.remove(entity);
+        entities.splice(entities.indexOf(entity), 1);
+        updateHUD();
+        gameOver();
+        return;
+      }
+    }
+
+    scene.remove(entity);
+    entities.splice(entities.indexOf(entity), 1);
+    updateHUD();
+  }
+
+  window.addEventListener('pointermove', e => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    setStyle('perfect-ring', 'left', e.clientX + 'px');
+    setStyle('perfect-ring', 'top', e.clientY + 'px');
+    setStyle('perfect-ring', 'opacity', gameActive && !isPaused ? '0.55' : '0');
+  });
+
+  window.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    if (!gameActive || isPaused) return;
+    playerState.isBoostingForward = true;
+    playerState.forwardTarget = -3.2;
+  });
+
+  window.addEventListener('pointerup', e => {
+    if (e.button !== 0) return;
+    playerState.isBoostingForward = false;
+    playerState.forwardTarget = 0;
+  });
+
+  window.addEventListener('pointercancel', () => {
+    playerState.isBoostingForward = false;
+    playerState.forwardTarget = 0;
+  });
+
+  window.addEventListener('blur', () => {
+    playerState.isBoostingForward = false;
+    playerState.forwardTarget = 0;
+  });
+
+  window.addEventListener('contextmenu', e => e.preventDefault());
+
+  window.addEventListener('keydown', e => {
+    const key = (e.key || '').toLowerCase();
+    if (key === 'q') triggerPulse();
+    if (key === 'm') toggleVariation();
+    if (key === 'g') cycleGenre();
+    if (key === 'a') showAudioMenu();
+    if (key === 'p') togglePause();
+    if (key === ' ') {
+      e.preventDefault();
+      volumeSettings.master = volumeSettings.master > 0 ? 0 : 80;
+      audioEngine.setMasterVolume();
+    }
+  });
+
+  bindClick('btn-start', () => generateWorld($('theme-input')?.value || 'neon'));
+  bindClick('btn-default', startRun);
+  bindClick('btn-restart', startRun);
+  bindClick('btn-resume', togglePause);
+  bindClick('btn-quit', () => location.reload());
+  bindClick('btn-audio-setup', showAudioMenu);
+  bindClick('btn-audio-pause', showAudioMenu);
+  bindClick('btn-custom-setup', showCustomMenu);
+  bindClick('btn-custom-pause', showCustomMenu);
+  bindClick('btn-achievements-view', showAchievementsMenu);
+  bindClick('btn-achievements-pause', showAchievementsMenu);
+  bindClick('btn-achievements-close', () => {
+    setDisplay('achievements-menu', 'none');
+    if (gameActive) setDisplay('pause-menu', 'flex');
+  });
+  bindClick('btn-custom-close', () => {
+    setDisplay('custom-menu', 'none');
+    if (gameActive) setDisplay('pause-menu', 'flex');
+  });
+  bindClick('btn-audio-close', () => {
+    setDisplay('audio-menu', 'none');
+    if (gameActive) setDisplay('pause-menu', 'flex');
+  });
+  bindClick('btn-genre-menu', () => {
+    setDisplay('pause-menu', 'none');
+    setDisplay('genre-menu', 'flex');
+  });
+  bindClick('btn-genre-confirm', () => {
+    setDisplay('genre-menu', 'none');
+    audioEngine.setGenre(currentGenre);
+    audioEngine.setVariation(currentVariation);
+    if (gameActive) setDisplay('pause-menu', 'flex');
+    updateHUD();
+  });
+  bindClick('m-pulse', triggerPulse);
+  bindClick('m-genre', cycleGenre);
+  bindClick('m-pause', togglePause);
+
+  document.querySelectorAll('.genre-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const scope = btn.parentElement;
+      scope.querySelectorAll('.genre-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      if (btn.dataset.genre) currentGenre = btn.dataset.genre;
+      if (btn.dataset.difficulty) gameSettings.difficulty = btn.dataset.difficulty;
+    });
+  });
+
+  document.querySelectorAll('.difficulty-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      gameSettings.difficulty = btn.dataset.difficulty;
+    });
+  });
+
+  const uploadZone = $('upload-zone');
+  const fileInput = $('audio-file-input');
+  const fileInfo = $('file-info');
+  if (uploadZone && fileInput) {
+    uploadZone.onclick = () => fileInput.click();
+    fileInput.onchange = e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      customAudioFile = file;
+      currentGenre = 'custom';
+      uploadZone.classList.add('has-file');
+      if (fileInfo) {
+        fileInfo.style.display = 'block';
+        fileInfo.textContent = '✓ ' + file.name + ' (' + (file.size / 1024 / 1024).toFixed(1) + 'MB)';
+      }
+      audioEngine.setCustomFile(file);
+    };
+  }
+
+  ['master', 'drums', 'ambient', 'bass', 'lead'].forEach(key => {
+    const slider = $('vol-' + key);
+    const label = $('vol-' + key + '-val');
+    if (!slider || !label) return;
+    slider.addEventListener('input', () => {
+      volumeSettings[key] = parseInt(slider.value, 10);
+      label.textContent = slider.value;
+      audioEngine.setMasterVolume();
+    });
+  });
+
+  const mapSetting = {
+    speed: 'speedMultiplier',
+    visuals: 'visualIntensity',
+    trails: 'trailDensity',
+    particles: 'particleCount'
+  };
+  Object.keys(mapSetting).forEach(key => {
+    const slider = $('setting-' + key);
+    const label = $('setting-' + key + '-val');
+    if (!slider || !label) return;
+    slider.addEventListener('input', () => {
+      label.textContent = slider.value;
+      gameSettings[mapSetting[key]] = parseInt(slider.value, 10) / 100;
+    });
+  });
+
+  populateAchievements();
+  renderLeaderboard();
+  updatePowerupHUD();
+  updateHUD();
+
+  let time = 0;
+  function animate(now) {
+    requestAnimationFrame(animate);
+    const dt = 0.016;
+    time += dt;
+
+    if (!gameActive || isPaused) {
+      gridA.position.z = (gridA.position.z + 0.02) % 4;
+      gridB.position.z = (gridB.position.z + 0.03) % 4;
+      tunnelGroup.children.forEach(r => {
+        r.rotation.z += 0.001;
+      });
+      renderer.render(scene, camera);
+      return;
+    }
+
+    playerState.smoothMouse.lerp(mouse, BALANCE.inputSmoothing);
+    raycaster.setFromCamera(playerState.smoothMouse, camera);
+    const hitPlane = raycaster.ray.intersectPlane(plane, playerState.targetPos);
+    if (hitPlane) {
+      const springForce = new THREE.Vector3().subVectors(playerState.targetPos, playerState.pos).multiplyScalar(BALANCE.spring);
+      playerState.vel.add(springForce);
+      playerState.vel.multiplyScalar(1 - BALANCE.damping);
+      playerState.pos.add(playerState.vel);
+      playerState.forwardOffset = THREE.MathUtils.lerp(playerState.forwardOffset, playerState.forwardTarget, 0.08);
+      playerState.pos.z = playerState.baseZ + playerState.forwardOffset;
+      playerGroup.position.copy(playerState.pos);
+      playerGroup.rotation.z = THREE.MathUtils.lerp(playerGroup.rotation.z, -playerState.vel.x * BALANCE.tiltRoll, 0.18);
+      playerGroup.rotation.x = THREE.MathUtils.lerp(playerGroup.rotation.x, -playerState.vel.y * BALANCE.tiltPitch, 0.18);
+      playerGroup.rotation.y += 0.02;
+    }
+
+    let targetCamY = 5 + playerState.pos.y * 0.18;
+    let targetCamZ = 15 - playerState.forwardOffset * 0.7;
+    if (overdriveTime > 0) {
+      overdriveTime -= dt;
+      targetCamY += 2.2;
+      targetCamZ = 19;
+      camState.baseFov = THREE.MathUtils.lerp(camState.baseFov, 92, 0.06);
+      overdriveShield.material.opacity = overdriveTime < 2 ? (Math.sin(time * 30) * 0.5 + 0.5) * 0.8 : 0.55 + Math.sin(time * 8) * 0.2;
+      overdriveShield.rotation.y += 0.05;
+      overdriveShield.rotation.z += 0.03;
+    } else {
+      camState.baseFov = THREE.MathUtils.lerp(camState.baseFov, 75, 0.06);
+      overdriveShield.material.opacity = 0;
+    }
+
+    camState.pos.x = THREE.MathUtils.lerp(camState.pos.x, playerState.pos.x * 0.42 + playerState.vel.x * 1.4, BALANCE.cameraLag);
+    camState.pos.y = THREE.MathUtils.lerp(camState.pos.y, targetCamY, BALANCE.cameraLag);
+    const sx = camState.shake > 0.01 ? (Math.random() - 0.5) * camState.shake : 0;
+    const sy = camState.shake > 0.01 ? (Math.random() - 0.5) * camState.shake : 0;
+    camState.shake *= 0.9;
+    camera.position.set(camState.pos.x + sx, camState.pos.y + sy, THREE.MathUtils.lerp(camera.position.z, targetCamZ, 0.05));
+    camState.lookAt.lerp(new THREE.Vector3(playerState.pos.x * 0.18, 0, -20 + playerState.forwardOffset * 1.5), 0.08);
+    camera.lookAt(camState.lookAt);
+    camera.rotation.z = playerGroup.rotation.z * 0.08;
+    camera.fov = camState.baseFov + (speed - 1) * 12 + playerState.vel.length() * 5;
+    camera.updateProjectionMatrix();
+
+    thruster.scale.y = 1 + playerState.vel.length() * 2.5 + Math.sin(time * 18) * 0.22;
+    shield.scale.setScalar(1 + Math.sin(time * 3) * 0.06);
+    neonPrimary.position.copy(playerGroup.position);
+    neonPrimary.position.z += 2;
+    neonPrimary.intensity *= 0.95;
+    neonSecondary.intensity *= 0.97;
+    if (hyperGlow > 0) {
+      neonAccentA.intensity = 1.6 + Math.sin(time * 6) * 0.4;
+      neonAccentB.intensity = 1.4 + Math.cos(time * 5) * 0.35;
+    } else {
+      neonAccentA.intensity = 1.0;
+      neonAccentB.intensity = 0.9;
+    }
+
+    const introMoveFactor = performance.now() < startSlowUntil
+      ? THREE.MathUtils.lerp(0.72, 1.0, 1 - ((startSlowUntil - performance.now()) / 8000))
+      : 1.0;
+    const stepDist = speed * 0.62 * introMoveFactor;
+    gridA.position.z = (gridA.position.z + stepDist) % 4;
+    gridB.position.z = (gridB.position.z + stepDist * 1.1) % 4;
+
+    tunnelGroup.children.forEach((r, idx) => {
+      r.position.z += stepDist * 0.48;
+      r.scale.lerp(new THREE.Vector3(1, 1, 1), 0.12);
+      r.rotation.z += 0.002 + idx * 0.0001;
+      r.material.opacity = 0.1 + (Math.sin(time * 2.2 + idx) * 0.5 + 0.5) * 0.12;
+      if (r.position.z > 15) r.position.z = -13 * 16;
+    });
+
+    skylineGroup.children.forEach((tower, idx) => {
+      tower.position.z += stepDist * 0.95;
+      if (tower.position.z > 30) tower.position.z = -220 - Math.random() * 80;
+      tower.material.emissiveIntensity = 0.04 + (Math.sin(time * 1.4 + tower.userData.phase + idx * 0.1) * 0.5 + 0.5) * 0.12;
+    });
+
+    auroraGroup.children.forEach((band, idx) => {
+      band.position.z += stepDist * 0.25;
+      if (band.position.z > 20) band.position.z = -220 - idx * 30;
+      band.material.opacity = 0.035 + (Math.sin(time * 1.2 + band.userData.phase) * 0.5 + 0.5) * 0.045;
+      band.rotation.z += Math.sin(time * 0.4 + idx) * 0.0008;
+    });
+
+    monolithGroup.children.forEach(m => {
+      m.position.z += stepDist * 1.2;
+      if (m.position.z > 18) m.position.z = -260 - Math.random() * 40;
+      m.position.y = m.userData.baseY + Math.sin(time * 2 + m.userData.phase) * 0.4;
+      m.material.emissiveIntensity = 0.06 + (Math.sin(time * 2 + m.userData.phase) * 0.5 + 0.5) * 0.08;
+    });
+
+    const dustArray = dust.geometry.attributes.position.array;
+    for (let i = 2; i < dustArray.length; i += 3) {
+      dustArray[i] += speed * 1.4;
+      if (dustArray[i] > 12) dustArray[i] = -260 - Math.random() * 20;
+    }
+    dust.geometry.attributes.position.needsUpdate = true;
+
+    expirePowerups();
+
+    if (autoPulseEnabled && focus >= 100 && performance.now() > playerState.pulseActiveUntil + 500) triggerPulse();
+
+    if (Math.random() < 0.7 * gameSettings.trailDensity) {
+      const trail = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 6, 6),
+        new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0x00f5d4 : 0xf72585, transparent: true, opacity: 0.75 * gameSettings.visualIntensity, blending: THREE.AdditiveBlending })
+      );
+      trail.position.copy(playerGroup.position);
+      trail.position.z += 0.9;
+      trail.userData.life = 1;
+      scene.add(trail);
+      trails.push(trail);
+    }
+
+    for (let i = trails.length - 1; i >= 0; i--) {
+      const t = trails[i];
+      t.userData.life -= 0.045;
+      t.scale.setScalar(Math.max(0.01, t.userData.life));
+      t.material.opacity = Math.max(0, t.userData.life) * 0.8;
+      if (t.userData.life <= 0) {
+        scene.remove(t);
+        trails.splice(i, 1);
+      }
+    }
+
+    for (let i = explosions.length - 1; i >= 0; i--) {
+      const e = explosions[i];
+      e.position.add(e.userData.vel);
+      e.rotation.x += e.userData.rot;
+      e.rotation.y += e.userData.rot;
+      e.userData.life -= 0.04;
+      e.scale.setScalar(Math.max(0.01, e.userData.life));
+      e.material.opacity = Math.max(0, e.userData.life);
+      if (e.userData.life <= 0) {
+        scene.remove(e);
+        explosions.splice(i, 1);
+      }
+    }
+
+    for (let i = energyRings.length - 1; i >= 0; i--) {
+      const r = energyRings[i];
+      r.userData.life -= 0.03;
+      r.scale.setScalar(1 + (1 - r.userData.life) * r.userData.grow);
+      r.material.opacity = Math.max(0, r.userData.life * 0.7);
+      if (r.userData.life <= 0) {
+        scene.remove(r);
+        energyRings.splice(i, 1);
+      }
+    }
+
+    const difficultyFactor = gameSettings.difficulty === 'easy' ? 1.15 : gameSettings.difficulty === 'hard' ? 0.82 : 1;
+    const introSlowFactor = performance.now() < startSlowUntil
+      ? THREE.MathUtils.lerp(1.45, 1.0, 1 - ((startSlowUntil - performance.now()) / 8000))
+      : 1.0;
+    if (now - lastSpawn > (((BALANCE.spawnRate / speed) * difficultyFactor * currentSpawnRateMultiplier * introSlowFactor) / timeWarpFactor)) {
+      spawn();
+      lastSpawn = now;
+    }
+
+    for (let i = entities.length - 1; i >= 0; i--) {
+      const e = entities[i];
+      e.position.z += speed * 0.9;
+      e.rotation.x += e.userData.rot;
+      e.rotation.y += e.userData.rot;
+      e.position.y = e.userData.baseY + Math.sin(time * 3 + e.userData.pulsePhase) * 0.18;
+      const pulseScale = 1 + Math.sin(time * 5 + e.userData.pulsePhase) * 0.03;
+      const typeScaleBoost = e.userData.type === 'n' ? orbScaleBoost : 1;
+      e.scale.setScalar((e.userData.scaleBase || 1) * pulseScale * typeScaleBoost);
+      if (e.children[0]) e.children[0].scale.setScalar(1.02 + Math.sin(time * 5 + e.position.x) * 0.12);
+      if (e.children[1]) e.children[1].scale.setScalar(1.08 + Math.sin(time * 4 + e.userData.pulsePhase) * 0.1);
+      e.material.emissiveIntensity = e.userData.type === 'h' ? 0.9 : 0.72 + (Math.sin(time * 4 + e.userData.pulsePhase) * 0.5 + 0.5) * 0.3;
+      if (magnetRadius > 0 && e.userData.type === 'n') {
+        const toPlayer = new THREE.Vector3().subVectors(playerGroup.position, e.position);
+        const magnetDist = toPlayer.length();
+        if (magnetDist < magnetRadius) {
+          e.position.add(toPlayer.normalize().multiplyScalar(0.08 + (magnetRadius - magnetDist) * 0.02));
+        }
+      }
+      const dist = playerGroup.position.distanceTo(e.position);
+      if (Math.abs(e.position.z - playerGroup.position.z) < 1.0 && dist < 2.9) {
+        if (e.userData.type === 'p') {
+          activatePowerup(e.userData.powerup);
+          createExplosion(e.position, true);
+          flash('rgba(255,214,10,0.28)');
+          scene.remove(e);
+          entities.splice(i, 1);
+          continue;
+        }
+        if (overdriveTime > 0 && e.userData.type === 'h') {
+          score += 700;
+          createHitUI('SMASH!', '#ffd60a', e.position);
+          createExplosion(e.position, true);
+          flash('rgba(255,214,10,0.35)');
+          scene.remove(e);
+          entities.splice(i, 1);
+          updateHUD();
+          continue;
+        }
+        hit(e, dist < 1.45);
+        continue;
+      }
+      if (e.position.z > 24) {
+        if (e.userData.type === 'n' && !comboDecaySafe) combo = 0;
+        scene.remove(e);
+        entities.splice(i, 1);
+        updateHUD();
+      }
+    }
+
+    if ((performance.now() - gameStartTime) / 1000 / 60 >= 5) checkAchievement('survivor');
+
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  animate(0);
+})();
+</script>
+</body>
+</html>
